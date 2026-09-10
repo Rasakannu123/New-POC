@@ -11,6 +11,8 @@ and extracts the top important fields and values as structured JSON.
 - Images are downscaled to max 2048 px on the long side before sending.
 - Responses are parsed robustly (code fences stripped, first JSON object
   extracted). A failed page never stops the pipeline.
+- `extract_async()` is the network-bound path used by the concurrent
+  pipeline; `extract()` remains for synchronous callers.
 """
 
 from __future__ import annotations
@@ -60,8 +62,14 @@ class ExtractionResult:
 class ExtractionEngine:
     """Extracts top fields/values from a page image via the routed model."""
 
-    def __init__(self, client=None, max_image_side: int = MAX_IMAGE_SIDE) -> None:
+    def __init__(
+        self,
+        client=None,
+        async_client=None,
+        max_image_side: int = MAX_IMAGE_SIDE,
+    ) -> None:
         self._client = client
+        self._async_client = async_client
         self.max_image_side = max_image_side
 
     def extract(self, image: Image.Image, decision: RoutingDecision) -> ExtractionResult:
@@ -97,10 +105,51 @@ class ExtractionEngine:
         result.processing_time = round(time.perf_counter() - started, 2)
         return result
 
+    async def extract_async(
+        self, image: Image.Image, decision: RoutingDecision
+    ) -> ExtractionResult:
+        """Extract fields from one page image without blocking the event loop."""
+        result = ExtractionResult(model=decision.model)
+        started = time.perf_counter()
+        try:
+            payload = self._to_base64_png(image)
+            response = await self._get_async_client().chat.completions.create(
+                model=decision.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": EXTRACTION_PROMPT},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{payload}"
+                                },
+                            },
+                        ],
+                    }
+                ],
+                max_tokens=1000,
+            )
+            raw = response.choices[0].message.content or ""
+            result.raw_response = raw
+            result.fields, result.confidence_scores = self._parse_json_object(raw)
+            result.success = True
+        except Exception as exc:
+            result.error = f"{type(exc).__name__}: {exc}"
+            logger.error("Extraction failed (%s): %s", decision.model, exc)
+        result.processing_time = round(time.perf_counter() - started, 2)
+        return result
+
     def _get_client(self):
         if self._client is None:
             self._client = ModelRouter.create_client()
         return self._client
+
+    def _get_async_client(self):
+        if self._async_client is None:
+            self._async_client = ModelRouter.create_async_client()
+        return self._async_client
 
     def _to_base64_png(self, image: Image.Image) -> str:
         img = image.convert("RGB")

@@ -19,6 +19,7 @@ Pipeline (each step can be toggled individually):
 
 from __future__ import annotations
 
+import io
 import logging
 from dataclasses import dataclass, field
 
@@ -187,3 +188,37 @@ class ImagePreprocessingEngine:
     def _unsharp_mask(gray: np.ndarray, amount: float = 1.0, sigma: float = 2.0) -> np.ndarray:
         blurred = cv2.GaussianBlur(gray, (0, 0), sigmaX=sigma)
         return cv2.addWeighted(gray, 1.0 + amount, blurred, -amount, 0)
+
+
+def preprocess_page_bytes(
+    png_bytes: bytes,
+    denoise: bool = True,
+    deskew: bool = True,
+    enhance_contrast: bool = True,
+    deblur: bool = True,
+    binarize: bool = False,
+) -> tuple[bytes, bytes, float, list[str]]:
+    """Process-pool entry point: enhance one encoded page, return encoded bytes."""
+    engine = ImagePreprocessingEngine(
+        denoise=denoise,
+        deskew=deskew,
+        enhance_contrast=enhance_contrast,
+        deblur=deblur,
+        binarize=binarize,
+    )
+    image = Image.open(io.BytesIO(png_bytes))
+    enhanced, report = engine.enhance_with_report(image)
+
+    enhanced_buffer = io.BytesIO()
+    enhanced.save(enhanced_buffer, format="PNG")
+
+    pre_binarize = report.pre_binarize_image or enhanced
+    pre_buffer = io.BytesIO()
+    pre_binarize.save(pre_buffer, format="PNG")
+
+    return (
+        enhanced_buffer.getvalue(),
+        pre_buffer.getvalue(),
+        report.deskew_angle,
+        report.steps_applied,
+    )

@@ -49,3 +49,13 @@ POPPLER_PATH = os.getenv("POPPLER_PATH") or None
 
 INPUT_DIR = Path(os.getenv("INPUT_DIR") or PROJECT_ROOT / "data" / "input")
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR") or PROJECT_ROOT / "data" / "output")
+
+# --- Concurrency -----------------------------------------------------------
+# Documents processed in parallel (thread pool; Poppler releases the GIL).
+MAX_CONCURRENT_DOCUMENTS = _int("MAX_CONCURRENT_DOCUMENTS", 2)
+# Pages extracted in parallel (async tasks capped by this semaphore).
+MAX_CONCURRENT_PAGES = _int("MAX_CONCURRENT_PAGES", 4)
+# Worker processes for the CPU-bound preprocessing stage (0 = cpu_count).
+PREPROCESS_WORKERS = _int("PREPROCESS_WORKERS", 0) or (os.cpu_count() or 1)
+# Worker threads for the Tesseract subprocess calls in quality assessment.
+ASSESS_WORKERS = _int("ASSESS_WORKERS", 4)

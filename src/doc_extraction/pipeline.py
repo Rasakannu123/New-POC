@@ -5,6 +5,12 @@ Flow:
     Input/*.pdf -> convert -> enhance -> assess -> route -> extract
         -> store in Output/
 
+Concurrency model (one mechanism per bottleneck):
+    - Documents  : ThreadPoolExecutor  (Poppler releases the GIL)
+    - Preprocess : ProcessPoolExecutor (CPU-bound OpenCV / NumPy)
+    - Assess     : ThreadPoolExecutor  (Tesseract subprocess releases the GIL)
+    - Extract    : asyncio.gather      (network-bound API calls)
+
 Per page, two files are written to Output/:
     <documentname>_<pageno>_q<qualityscore>.png   enhanced image
     <documentname>_<pageno>_q<qualityscore>.json  extracted data + metadata
@@ -12,18 +18,185 @@ Per page, two files are written to Output/:
 
 from __future__ import annotations
 
+import asyncio
+import io
 import json
 import logging
 import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+
+from PIL import Image
 
 from src.doc_extraction import config
 from src.doc_extraction.layers.conversion import ImageConversionLayer
 from src.doc_extraction.layers.extraction import ExtractionEngine
-from src.doc_extraction.layers.preprocessing import ImagePreprocessingEngine
+from src.doc_extraction.layers.preprocessing import preprocess_page_bytes
 from src.doc_extraction.layers.quality import QualityAssessmentEngine
 from src.doc_extraction.layers.router import ModelRouter
 
+logger = logging.getLogger("pipeline")
+
 SUPPORTED_EXTENSIONS = {".pdf"}
+
+
+class Pipeline:
+    """Runs the full conversion -> extraction pipeline with staged concurrency."""
+
+    def __init__(
+        self,
+        preprocess_pool: ProcessPoolExecutor,
+        assess_pool: ThreadPoolExecutor,
+        page_semaphore: int,
+    ) -> None:
+        self.converter = ImageConversionLayer(dpi=config.DPI)
+        self.quality_engine = QualityAssessmentEngine()
+        self.router = ModelRouter()
+        self.extractor = ExtractionEngine()
+        self.preprocess_pool = preprocess_pool
+        self.assess_pool = assess_pool
+        self.page_semaphore = page_semaphore
+
+    def process_pdf(self, pdf_path) -> tuple[int, int]:
+        """Process one PDF; returns (pages_done, pages_failed)."""
+        logger.info("Processing: %s", pdf_path.name)
+        started = time.perf_counter()
+
+        result = self.converter.convert_pages(pdf_path)
+        if not result.success:
+            logger.error("  -> FAILED: %s", result.error)
+            return 0, 0
+
+        if result.page_count == 0:
+            return 0, 0
+
+        page_bytes = self._encode_pages(result.pages)
+
+        enhanced_futures = [
+            self.preprocess_pool.submit(preprocess_page_bytes, payload)
+            for payload in page_bytes
+        ]
+        preprocessed = [future.result() for future in enhanced_futures]
+
+        assess_futures = [
+            self.assess_pool.submit(self._assess, pre_binarize_bytes)
+            for (_enhanced, pre_binarize_bytes, _angle, _steps) in preprocessed
+        ]
+        assessments = [future.result() for future in assess_futures]
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is not None:
+            records = loop.run_until_complete(self._extract_all(preprocessed, assessments))
+        else:
+            records = asyncio.run(self._extract_all(preprocessed, assessments))
+
+        pad = max(1, len(str(result.page_count)))
+        for page_number, (enhanced_bytes, assessment, extraction) in enumerate(
+            records, start=1
+        ):
+            self._write_page(
+                result.source_pdf, page_number, pad, enhanced_bytes, assessment, extraction
+            )
+
+        logger.info(
+            "  -> OK: %d page(s) processed in %.2fs",
+            result.page_count,
+            time.perf_counter() - started,
+        )
+        return result.page_count, 0
+
+    def _encode_pages(self, pages) -> list[bytes]:
+        payloads: list[bytes] = []
+        for page in pages:
+            buffer = io.BytesIO()
+            page.convert("RGB").save(buffer, format="PNG")
+            payloads.append(buffer.getvalue())
+        return payloads
+
+    def _assess(self, pre_binarize_bytes: bytes):
+        image = Image.open(io.BytesIO(pre_binarize_bytes))
+        return self.quality_engine.assess(image)
+
+    async def _extract_all(self, preprocessed, assessments):
+        semaphore = asyncio.Semaphore(self.page_semaphore)
+        async_client = ModelRouter.create_async_client()
+        extractor = ExtractionEngine(async_client=async_client)
+
+        async def one(enhanced_bytes, assessment):
+            decision = self.router.route(assessment)
+            image = Image.open(io.BytesIO(enhanced_bytes))
+            async with semaphore:
+                extraction = await extractor.extract_async(image, decision)
+            return enhanced_bytes, assessment, extraction
+
+        tasks = [
+            one(enhanced, assessment)
+            for (enhanced, _pb, _a, _s), assessment in zip(preprocessed, assessments)
+        ]
+        try:
+            return await asyncio.gather(*tasks)
+        finally:
+            await async_client.close()
+
+    def _write_page(
+        self,
+        source_pdf,
+        page_number: int,
+        pad: int,
+        enhanced_bytes: bytes,
+        assessment,
+        extraction,
+    ) -> None:
+        document_name = source_pdf.stem
+        base_name = (
+            f"{document_name}_{page_number:0{pad}d}"
+            f"_q{int(round(assessment.score))}"
+        )
+        image_name = f"{base_name}.{config.IMAGE_FORMAT}"
+        (config.OUTPUT_DIR / image_name).write_bytes(enhanced_bytes)
+
+        confidence_values = list(extraction.confidence_scores.values())
+        overall_confidence = (
+            round(sum(confidence_values) / len(confidence_values), 1)
+            if confidence_values
+            else 0.0
+        )
+
+        record = {
+            "document": source_pdf.name,
+            "page": page_number,
+            "image_file": image_name,
+            "quality_score": assessment.score,
+            "quality_tier": assessment.tier,
+            "model_used": extraction.model,
+            "extracted_fields": extraction.fields,
+            "field_confidence_scores": extraction.confidence_scores,
+            "confidence_score": overall_confidence,
+            "extraction_success": extraction.success,
+            "processing_time_seconds": extraction.processing_time,
+        }
+        if extraction.error:
+            record["error"] = extraction.error
+
+        json_name = f"{base_name}.json"
+        (config.OUTPUT_DIR / json_name).write_text(
+            json.dumps(record, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        logger.info(
+            "     %s | score=%.1f tier=%s | model=%s | %d field(s) in %.1fs -> %s",
+            image_name,
+            assessment.score,
+            assessment.tier,
+            extraction.model,
+            len(extraction.fields),
+            extraction.processing_time,
+            json_name,
+        )
 
 
 def run() -> int:
@@ -32,7 +205,6 @@ def run() -> int:
         format="%(asctime)s | %(levelname)-7s | %(message)s",
         datefmt="%H:%M:%S",
     )
-    logger = logging.getLogger("pipeline")
 
     config.INPUT_DIR.mkdir(parents=True, exist_ok=True)
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -52,95 +224,27 @@ def run() -> int:
 
     logger.info("Found %d PDF document(s) in the input folder.", len(pdf_files))
 
-    converter = ImageConversionLayer(dpi=config.DPI)
-    preprocessor = ImagePreprocessingEngine()
-    quality_engine = QualityAssessmentEngine()
-    router = ModelRouter()
-    extractor = ExtractionEngine()
-
     succeeded = 0
     failed = 0
     total_images = 0
 
-    for pdf_path in pdf_files:
-        logger.info("Processing: %s", pdf_path.name)
-        started = time.perf_counter()
+    with ProcessPoolExecutor(max_workers=config.PREPROCESS_WORKERS) as preprocess_pool, \
+            ThreadPoolExecutor(max_workers=config.ASSESS_WORKERS) as assess_pool:
+        pipeline = Pipeline(preprocess_pool, assess_pool, config.MAX_CONCURRENT_PAGES)
 
-        result = converter.convert_pages(pdf_path)
-        if not result.success:
-            failed += 1
-            logger.error("  -> FAILED: %s", result.error)
-            continue
-
-        pad = max(1, len(str(result.page_count)))
-        document_name = pdf_path.stem
-
-        for page_number, page_image in enumerate(result.pages, start=1):
-            enhanced, prep_report = preprocessor.enhance_with_report(page_image)
-
-            assessment = quality_engine.assess(
-                prep_report.pre_binarize_image or enhanced
-            )
-
-            decision = router.route(assessment)
-
-            extraction = extractor.extract(enhanced, decision)
-
-            base_name = (
-                f"{document_name}_{page_number:0{pad}d}"
-                f"_q{int(round(assessment.score))}"
-            )
-            image_name = f"{base_name}.{config.IMAGE_FORMAT}"
-            enhanced.save(str(config.OUTPUT_DIR / image_name))
-            total_images += 1
-
-            confidence_values = list(extraction.confidence_scores.values())
-            overall_confidence = (
-                round(sum(confidence_values) / len(confidence_values), 1)
-                if confidence_values
-                else 0.0
-            )
-
-            record = {
-                "document": pdf_path.name,
-                "page": page_number,
-                "image_file": image_name,
-                "quality_score": assessment.score,
-                "quality_tier": assessment.tier,
-                "model_used": decision.model,
-                "extracted_fields": extraction.fields,
-                "field_confidence_scores": extraction.confidence_scores,
-                "confidence_score": overall_confidence,
-                "extraction_success": extraction.success,
-                "processing_time_seconds": extraction.processing_time,
-            }
-            if extraction.error:
-                record["error"] = extraction.error
-
-            json_name = f"{base_name}.json"
-            (config.OUTPUT_DIR / json_name).write_text(
-                json.dumps(record, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-
-            logger.info(
-                "     %s | score=%.1f tier=%s | model=%s | %d field(s) "
-                "in %.1fs -> %s",
-                image_name,
-                assessment.score,
-                assessment.tier,
-                decision.model,
-                len(extraction.fields),
-                extraction.processing_time,
-                json_name,
-            )
-
-        succeeded += 1
-        logger.info(
-            "  -> OK: %d page(s) processed in %.2fs",
-            result.page_count,
-            time.perf_counter() - started,
-        )
+        with ThreadPoolExecutor(max_workers=config.MAX_CONCURRENT_DOCUMENTS) as doc_pool:
+            futures = {doc_pool.submit(pipeline.process_pdf, pdf): pdf for pdf in pdf_files}
+            for future, pdf in futures.items():
+                try:
+                    pages_done, _ = future.result()
+                    if pages_done:
+                        succeeded += 1
+                        total_images += pages_done
+                    else:
+                        failed += 1
+                except Exception as exc:
+                    failed += 1
+                    logger.error("  -> FAILED: %s: %s", pdf.name, exc)
 
     logger.info(
         "Done. %d document(s) succeeded, %d failed, %d image(s) written to '%s'.",

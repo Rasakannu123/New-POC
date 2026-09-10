@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Threading — Concurrency Model</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #eb6c36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Threading · Concurrency Model</p>
+    <h1>Threading — one process, one GIL, interleaved on I/O</h1>
+    <svg viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="threading-title threading-desc">
+      <title id="threading-title">Threading concurrency model</title>
+      <desc id="threading-desc">Two worker threads in a single process take turns holding the GIL, releasing it during I/O so the other thread can run.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+      </defs>
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <line x1="150" y1="76" x2="150" y2="540" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="400" y1="76" x2="400" y2="540" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="650" y1="76" x2="650" y2="540" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="880" y1="76" x2="880" y2="540" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+
+      <rect x="396" y="196" width="8" height="120" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+      <rect x="646" y="356" width="8" height="124" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+      <rect x="876" y="228" width="8" height="88" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+      <rect x="876" y="388" width="8" height="92" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+
+      <line x1="150" y1="120" x2="398" y2="120" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="244" y="100" width="60" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="274" y="109" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SPAWN()</text>
+
+      <line x1="150" y1="152" x2="648" y2="152" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="369" y="132" width="60" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="399" y="141" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SPAWN()</text>
+
+      <line x1="400" y1="196" x2="878" y2="196" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+      <rect x="607" y="176" width="64" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="639" y="185" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ACQUIRE()</text>
+
+      <line x1="880" y1="228" x2="402" y2="228" stroke="#4f5d75" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <rect x="613" y="208" width="56" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="641" y="217" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">GRANTED</text>
+
+      <path d="M 404,264 H 444 V 288 H 412" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="452" y="272" width="60" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="456" y="281" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CPU WORK</text>
+
+      <line x1="400" y1="316" x2="878" y2="316" stroke="#4f5d75" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <rect x="589" y="296" width="100" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="639" y="305" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">RELEASE ON I/O</text>
+
+      <line x1="650" y1="356" x2="878" y2="356" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="732" y="336" width="64" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="764" y="345" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ACQUIRE()</text>
+
+      <line x1="880" y1="388" x2="652" y2="388" stroke="#4f5d75" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <rect x="738" y="368" width="56" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="766" y="377" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">GRANTED</text>
+
+      <path d="M 654,424 H 694 V 448 H 662" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="702" y="432" width="60" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="706" y="441" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CPU WORK</text>
+
+      <line x1="650" y1="480" x2="878" y2="480" stroke="#4f5d75" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <rect x="732" y="460" width="64" height="12" rx="2" fill="#f5f5f5"/>
+      <text x="764" y="469" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">RELEASE()</text>
+
+      <rect x="70" y="32" width="160" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="150" y="54" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Main Thread</text>
+      <text x="150" y="68" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">process</text>
+
+      <rect x="320" y="32" width="160" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="400" y="54" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Thread A</text>
+      <text x="400" y="68" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">worker</text>
+
+      <rect x="570" y="32" width="160" height="44" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+      <text x="650" y="54" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Thread B</text>
+      <text x="650" y="68" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">worker</text>
+
+      <rect x="800" y="32" width="160" height="44" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+      <text x="880" y="54" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">GIL</text>
+      <text x="880" y="68" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">1 per process</text>
+
+      <line x1="30" y1="556" x2="970" y2="556" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="30" y="576" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+      <line x1="110" y1="572" x2="134" y2="572" stroke="#4f5d75" stroke-width="1.2"/>
+      <text x="142" y="576" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CALL</text>
+      <line x1="210" y1="572" x2="234" y2="572" stroke="#4f5d75" stroke-width="1" stroke-dasharray="5,4"/>
+      <text x="242" y="576" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">RETURN</text>
+      <line x1="330" y1="572" x2="354" y2="572" stroke="#eb6c36" stroke-width="1.2"/>
+      <text x="362" y="576" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">FOCAL</text>
+    </svg>
+  </div>
+</body>
+</html>

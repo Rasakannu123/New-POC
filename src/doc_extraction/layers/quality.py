@@ -12,6 +12,9 @@ Tier thresholds:
     > 80   -> clear
     50-80  -> blurry
     < 50   -> very_blurry
+
+Thread safety: pytesseract is not reliably thread-safe, so all OCR calls
+are serialized behind an instance lock.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ from __future__ import annotations
 import logging
 import math
 import shutil
+import threading
 from dataclasses import dataclass, field
 
 import cv2
@@ -69,6 +73,7 @@ class QualityAssessmentEngine:
             raise ValueError("focus_scale must be > 0")
 
         self._pytesseract = None
+        self._ocr_lock = threading.Lock()
         self._init_ocr()
 
     def assess(self, image: Image.Image) -> QualityAssessment:
@@ -131,11 +136,12 @@ class QualityAssessmentEngine:
             }
 
         try:
-            data = self._pytesseract.image_to_data(
-                gray,
-                output_type=self._pytesseract.Output.DICT,
-                config=self.ocr_config,
-            )
+            with self._ocr_lock:
+                data = self._pytesseract.image_to_data(
+                    gray,
+                    output_type=self._pytesseract.Output.DICT,
+                    config=self.ocr_config,
+                )
 
             confidences: list[float] = []
             char_weights: list[int] = []
