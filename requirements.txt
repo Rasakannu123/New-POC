@@ -1,0 +1,16 @@
+# Configuration
+python-dotenv>=1.0.0
+
+# Step 1 - Image Conversion Layer
+pdf2image>=1.17.0
+Pillow>=10.0.0
+
+# Step 2 - Image Preprocessing Engine
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Step 3 - Quality Assessment Engine (OCR-confidence metric)
+pytesseract>=0.3.10
+
+# Step 4 - Model Router / Step 5 - Extraction (OpenAI-compatible gateway client)
+openai>=1.0.0

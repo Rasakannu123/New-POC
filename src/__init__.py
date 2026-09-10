@@ -1,0 +1,1 @@
+"""Document Extraction POC - source root."""
