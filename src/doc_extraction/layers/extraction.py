@@ -27,23 +27,11 @@ from dataclasses import dataclass, field
 from PIL import Image
 
 from src.doc_extraction.layers.router import ModelRouter, RoutingDecision
+from src.doc_extraction.prompts import EXTRACTION_PROMPT
 
 logger = logging.getLogger(__name__)
 
 MAX_IMAGE_SIDE = 2048
-MAX_FIELDS = 10
-
-EXTRACTION_PROMPT = (
-    "You are a document data-extraction engine. Examine this document page "
-    f"image and extract ONLY the top most important fields and their values "
-    f"(at most {MAX_FIELDS} fields - e.g. document type, dates, names, "
-    "amounts, reference numbers, addresses). "
-    'Return ONLY a valid JSON object with this exact format: '
-    '{"field_name": {"value": "extracted_value", "confidence": 85}}. '
-    "The confidence must be an integer 0-100 indicating your certainty. "
-    "No markdown, no code fences, no explanations. "
-    'If the page contains no meaningful fields, return exactly: {}'
-)
 
 
 @dataclass
