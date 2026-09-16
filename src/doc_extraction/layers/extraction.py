@@ -7,7 +7,9 @@ and extracts the top important fields and values as structured JSON.
     Enhanced image + RoutingDecision -> gateway vision model -> fields
 
 - Uses the OpenAI-compatible gateway from config (loaded from .env).
-- Only the top important "field: value" pairs are requested (max 10).
+- Extraction is locked to the configured template fields when
+  config.TEMPLATE_FIELDS is set; missing fields are returned as null.
+  Otherwise the top important fields are requested (max 10).
 - Images are downscaled to max 2048 px on the long side before sending.
 - Responses are parsed robustly (code fences stripped, first JSON object
   extracted). A failed page never stops the pipeline.

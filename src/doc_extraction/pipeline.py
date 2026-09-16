@@ -33,6 +33,13 @@ from src.doc_extraction.layers.extraction import ExtractionEngine
 from src.doc_extraction.layers.preprocessing import preprocess_page_bytes
 from src.doc_extraction.layers.quality import QualityAssessmentEngine
 from src.doc_extraction.layers.router import ModelRouter
+from src.doc_extraction.layers.split import (
+    VERDICT_NO,
+    VERDICT_UNCLEAR,
+    VERDICT_YES,
+    SplitDecision,
+    SplitEngine,
+)
 
 logger = logging.getLogger("pipeline")
 
@@ -52,6 +59,7 @@ class Pipeline:
         self.quality_engine = QualityAssessmentEngine()
         self.router = ModelRouter()
         self.extractor = ExtractionEngine()
+        self.split_engine = SplitEngine(no_need_fields=config.NO_NEED_PAGE_FIELDS)
         self.preprocess_pool = preprocess_pool
         self.assess_pool = assess_pool
         self.page_semaphore = page_semaphore
@@ -81,7 +89,28 @@ class Pipeline:
             self.assess_pool.submit(self._assess, pre_binarize_bytes)
             for (_enhanced, pre_binarize_bytes, _angle, _steps) in preprocessed
         ]
+        if self.split_engine.enabled:
+            split_futures = [
+                self.assess_pool.submit(self._classify, pre_binarize_bytes)
+                for (_enhanced, pre_binarize_bytes, _angle, _steps) in preprocessed
+            ]
+        else:
+            split_futures = []
+
         assessments = [future.result() for future in assess_futures]
+        if split_futures:
+            split_decisions = [future.result() for future in split_futures]
+        else:
+            split_decisions = [
+                SplitDecision(verdict=VERDICT_NO, reason="no_need_page gate disabled")
+                for _ in preprocessed
+            ]
+
+        needed_indices = [
+            index
+            for index, decision in enumerate(split_decisions)
+            if decision.verdict == VERDICT_NO
+        ]
 
         try:
             loop = asyncio.get_running_loop()
@@ -89,22 +118,54 @@ class Pipeline:
             loop = None
 
         if loop is not None:
-            records = loop.run_until_complete(self._extract_all(preprocessed, assessments))
+            extracted = loop.run_until_complete(
+                self._extract_all(preprocessed, assessments, needed_indices)
+            )
         else:
-            records = asyncio.run(self._extract_all(preprocessed, assessments))
-
-        pad = max(1, len(str(result.page_count)))
-        for page_number, (enhanced_bytes, assessment, extraction) in enumerate(
-            records, start=1
-        ):
-            self._write_page(
-                result.source_pdf, page_number, pad, enhanced_bytes, assessment, extraction
+            extracted = asyncio.run(
+                self._extract_all(preprocessed, assessments, needed_indices)
             )
 
+        extractions = dict(zip(needed_indices, extracted))
+
+        pad = max(1, len(str(result.page_count)))
+        for page_number, split_decision in enumerate(split_decisions, start=1):
+            index = page_number - 1
+            enhanced_bytes = preprocessed[index][0]
+            assessment = assessments[index]
+            if split_decision.verdict == VERDICT_YES:
+                self._write_skipped_page(
+                    result.source_pdf,
+                    page_number,
+                    pad,
+                    enhanced_bytes,
+                    assessment,
+                    split_decision,
+                )
+            elif split_decision.verdict == VERDICT_UNCLEAR:
+                self._write_manual_review_page(
+                    result.source_pdf,
+                    page_number,
+                    pad,
+                    enhanced_bytes,
+                    assessment,
+                    split_decision,
+                )
+            else:
+                enhanced_bytes, assessment, extraction = extractions[index]
+                self._write_page(
+                    result.source_pdf, page_number, pad, enhanced_bytes, assessment, extraction
+                )
+
+        skipped_count = sum(1 for d in split_decisions if d.verdict == VERDICT_YES)
+        review_count = sum(1 for d in split_decisions if d.verdict == VERDICT_UNCLEAR)
         logger.info(
-            "  -> OK: %d page(s) processed in %.2fs",
+            "  -> OK: %d page(s) in %.2fs (%d extracted, %d skipped, %d manual-review)",
             result.page_count,
             time.perf_counter() - started,
+            len(needed_indices),
+            skipped_count,
+            review_count,
         )
         return result.page_count, 0
 
@@ -120,7 +181,11 @@ class Pipeline:
         image = Image.open(io.BytesIO(pre_binarize_bytes))
         return self.quality_engine.assess(image)
 
-    async def _extract_all(self, preprocessed, assessments):
+    def _classify(self, pre_binarize_bytes: bytes) -> SplitDecision:
+        image = Image.open(io.BytesIO(pre_binarize_bytes))
+        return self.split_engine.classify(image)
+
+    async def _extract_all(self, preprocessed, assessments, indices):
         semaphore = asyncio.Semaphore(self.page_semaphore)
         async_client = ModelRouter.create_async_client()
         extractor = ExtractionEngine(async_client=async_client)
@@ -133,8 +198,8 @@ class Pipeline:
             return enhanced_bytes, assessment, extraction
 
         tasks = [
-            one(enhanced, assessment)
-            for (enhanced, _pb, _a, _s), assessment in zip(preprocessed, assessments)
+            one(preprocessed[index][0], assessments[index])
+            for index in indices
         ]
         try:
             return await asyncio.gather(*tasks)
@@ -151,10 +216,7 @@ class Pipeline:
         extraction,
     ) -> None:
         document_name = source_pdf.stem
-        base_name = (
-            f"{document_name}_{page_number:0{pad}d}"
-            f"_q{int(round(assessment.score))}"
-        )
+        base_name = f"{document_name}_{page_number:0{pad}d}"
         image_name = f"{base_name}.{config.IMAGE_FORMAT}"
         (config.OUTPUT_DIR / image_name).write_bytes(enhanced_bytes)
 
@@ -196,6 +258,85 @@ class Pipeline:
             len(extraction.fields),
             extraction.processing_time,
             json_name,
+        )
+
+    def _write_skipped_page(
+        self,
+        source_pdf,
+        page_number: int,
+        pad: int,
+        enhanced_bytes: bytes,
+        assessment,
+        decision,
+    ) -> None:
+        document_name = source_pdf.stem
+        base_name = f"{document_name}_{page_number:0{pad}d}"
+        image_name = f"{base_name}.{config.IMAGE_FORMAT}"
+        (config.SKIP_DIR / image_name).write_bytes(enhanced_bytes)
+
+        record = {
+            "document": source_pdf.name,
+            "page": page_number,
+            "image_file": image_name,
+            "quality_score": assessment.score,
+            "quality_tier": assessment.tier,
+            "page_skipped": True,
+            "skip_reason": decision.reason or "page matches no_need_page fields",
+            "split_reply": decision.raw_reply,
+            "extracted_fields": {},
+            "field_confidence_scores": {},
+            "confidence_score": 0.0,
+            "extraction_success": False,
+        }
+        json_name = f"{base_name}.json"
+        (config.SKIP_DIR / json_name).write_text(
+            json.dumps(record, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        logger.info(
+            "     %s | skipped by split gate -> %s",
+            base_name,
+            decision.reason,
+        )
+
+    def _write_manual_review_page(
+        self,
+        source_pdf,
+        page_number: int,
+        pad: int,
+        enhanced_bytes: bytes,
+        assessment,
+        decision,
+    ) -> None:
+        config.MANUAL_REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+        document_name = source_pdf.stem
+        base_name = f"{document_name}_{page_number:0{pad}d}"
+        image_name = f"{base_name}.{config.IMAGE_FORMAT}"
+        (config.MANUAL_REVIEW_DIR / image_name).write_bytes(enhanced_bytes)
+
+        record = {
+            "document": source_pdf.name,
+            "page": page_number,
+            "image_file": image_name,
+            "quality_score": assessment.score,
+            "quality_tier": assessment.tier,
+            "manual_review": True,
+            "split_reply": decision.raw_reply,
+            "split_reason": decision.reason,
+            "extracted_fields": {},
+            "field_confidence_scores": {},
+            "confidence_score": 0.0,
+            "extraction_success": False,
+        }
+        json_name = f"{base_name}.json"
+        (config.MANUAL_REVIEW_DIR / json_name).write_text(
+            json.dumps(record, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        logger.info(
+            "     %s | unclear split reply -> %s",
+            base_name,
+            config.MANUAL_REVIEW_DIR,
         )
 
 

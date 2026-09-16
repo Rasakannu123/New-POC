@@ -12,6 +12,8 @@ venv/
 # Runtime data folders - keep the folders, ignore the contents
 data/input/*
 data/output/*
+data/skip/*
+data/Manual-Review/*
 !data/input/.gitkeep
 !data/output/.gitkeep
 

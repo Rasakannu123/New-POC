@@ -7,6 +7,7 @@ Every endpoint, key, model identifier and pipeline setting lives in .env
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -49,6 +50,57 @@ POPPLER_PATH = os.getenv("POPPLER_PATH") or None
 
 INPUT_DIR = Path(os.getenv("INPUT_DIR") or PROJECT_ROOT / "data" / "input")
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR") or PROJECT_ROOT / "data" / "output")
+
+# --- Extraction template ----------------------------------------------------
+# Optional JSON schema ("extracted_fields": {field: ...}) that locks the
+# extraction to a fixed set of fields. Missing file -> free-form extraction.
+TEMPLATE_PATH = Path(
+    os.getenv("TEMPLATE_PATH") or PROJECT_ROOT / "data" / "Template" / "test.json"
+)
+
+
+def _load_template_fields(path: Path) -> list[str]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    block = data.get("extracted_fields", data) if isinstance(data, dict) else data
+    if isinstance(block, dict):
+        return [str(name) for name in block]
+    if isinstance(block, list):
+        return [str(name) for name in block]
+    return []
+
+
+TEMPLATE_FIELDS = _load_template_fields(TEMPLATE_PATH)
+
+
+def _load_no_need_page_fields(path: Path) -> list[str]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    block = data.get("no_need_page") or {}
+    if isinstance(block, dict):
+        return [str(name) for name in block]
+    if isinstance(block, list):
+        return [str(name) for name in block]
+    return []
+
+
+NO_NEED_PAGE_FIELDS = _load_no_need_page_fields(TEMPLATE_PATH)
+
+# --- Split gate (page relevance) --------------------------------------------
+# Model that decides whether a page is needed before extraction runs.
+SPLIT_MODEL = os.getenv("SPLIT_MODEL", "deepseek/deepseek-v4.1-flash:free")
+# Pages with an unclear split verdict are parked here for manual review.
+MANUAL_REVIEW_DIR = Path(
+    os.getenv("MANUAL_REVIEW_DIR") or PROJECT_ROOT / "data" / "Manual-Review"
+)
+# Pages the split gate marked as not needed are stored here.
+SKIP_DIR = Path(os.getenv("SKIP_DIR") or PROJECT_ROOT / "data" / "skip")
 
 # --- Concurrency -----------------------------------------------------------
 # Documents processed in parallel (thread pool; Poppler releases the GIL).

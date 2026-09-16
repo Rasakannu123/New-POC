@@ -1,0 +1,13 @@
+{
+    "extracted_fields": {
+    "document_type": "",
+    "invoice_number": "",
+    "date": "",
+    "supplier_name": "",
+    "supplier_trn": "",
+    "buyer_name": ""
+  },
+  "no_need_page":{
+    "delivery-note-no":""
+  }
+}
