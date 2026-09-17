@@ -94,7 +94,7 @@ NO_NEED_PAGE_FIELDS = _load_no_need_page_fields(TEMPLATE_PATH)
 
 # --- Split gate (page relevance) --------------------------------------------
 # Model that decides whether a page is needed before extraction runs.
-SPLIT_MODEL = os.getenv("SPLIT_MODEL", "deepseek/deepseek-v4.1-flash:free")
+SPLIT_MODEL = os.getenv("SPLIT_MODEL", "qwen/qwen-plus-2025-07-28:free")
 # Pages with an unclear split verdict are parked here for manual review.
 MANUAL_REVIEW_DIR = Path(
     os.getenv("MANUAL_REVIEW_DIR") or PROJECT_ROOT / "data" / "Manual-Review"

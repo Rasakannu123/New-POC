@@ -14,3 +14,8 @@ pytesseract>=0.3.10
 
 # Step 4 - Model Router / Step 5 - Extraction (OpenAI-compatible gateway client)
 openai>=1.0.0
+
+# Review UI API server (src/doc_extraction/server.py)
+fastapi>=0.110.0
+uvicorn>=0.29.0
+python-multipart>=0.0.9
