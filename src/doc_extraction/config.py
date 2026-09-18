@@ -93,7 +93,8 @@ def _load_no_need_page_fields(path: Path) -> list[str]:
 NO_NEED_PAGE_FIELDS = _load_no_need_page_fields(TEMPLATE_PATH)
 
 # --- Split gate (page relevance) --------------------------------------------
-# Model that decides whether a page is needed before extraction runs.
+# The gate matches no_need_page keywords locally (no model call).
+# Reserved for an optional future model fallback on borderline pages.
 SPLIT_MODEL = os.getenv("SPLIT_MODEL", "qwen/qwen-plus-2025-07-28:free")
 # Pages with an unclear split verdict are parked here for manual review.
 MANUAL_REVIEW_DIR = Path(

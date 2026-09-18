@@ -1,11 +1,10 @@
 """
-Split prompt (page relevance gate)
-----------------------------------
-Sent to the split model (config.SPLIT_MODEL) together with the Tesseract
-OCR text of one page. The model must answer with a single word: "yes"
-(the page matches a no_need_page field and is skipped) or "no" (the page
-is needed and continues to extraction). Anything else counts as unclear
-and sends the page to the Manual-Review folder.
+Split prompt (page relevance gate) - RESERVED FOR FUTURE USE
+-------------------------------------------------------------
+The split gate currently matches no_need_page keywords locally
+(layers/split.py) and does not call a model. This prompt is kept for an
+optional future fallback: sending only borderline pages to the model
+(config.SPLIT_MODEL) for a yes/no second opinion.
 """
 
 from __future__ import annotations

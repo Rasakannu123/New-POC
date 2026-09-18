@@ -1,34 +1,10 @@
-"""Tests for the split gate verdict parsing (no external services)."""
+"""Tests for the local split-gate keyword matching (no model, no OCR)."""
 
 from src.doc_extraction.layers.split import (
     VERDICT_NO,
-    VERDICT_UNCLEAR,
     VERDICT_YES,
     SplitEngine,
 )
-
-
-def test_parse_verdict_exact():
-    assert SplitEngine._parse_verdict("yes") == VERDICT_YES
-    assert SplitEngine._parse_verdict("no") == VERDICT_NO
-
-
-def test_parse_verdict_with_punctuation_and_case():
-    assert SplitEngine._parse_verdict("YES.") == VERDICT_YES
-    assert SplitEngine._parse_verdict("No.") == VERDICT_NO
-
-
-def test_parse_verdict_last_match_wins():
-    assert (
-        SplitEngine._parse_verdict("The label appears, so the final answer: yes")
-        == VERDICT_YES
-    )
-    assert SplitEngine._parse_verdict("yes or no? final: no") == VERDICT_NO
-
-
-def test_parse_verdict_unclear():
-    assert SplitEngine._parse_verdict("The page is not needed") == VERDICT_UNCLEAR
-    assert SplitEngine._parse_verdict("") == VERDICT_UNCLEAR
 
 
 def test_gate_disabled_treats_page_as_needed():
@@ -36,3 +12,39 @@ def test_gate_disabled_treats_page_as_needed():
     decision = engine.classify(None)
     assert decision.verdict == VERDICT_NO
     assert decision.reason == "no_need_page gate disabled"
+
+
+def test_exact_match_after_normalization():
+    engine = SplitEngine(no_need_fields=["delivery-note-no"])
+    decision = engine._match_keywords("TAX INVOICE\n\nDelivery-Note No: 45871")
+    assert decision.verdict == VERDICT_YES
+    assert decision.raw_reply == "matched 'delivery-note-no'"
+
+
+def test_fuzzy_match_survives_ocr_errors():
+    engine = SplitEngine(no_need_fields=["delivery note no"])
+    decision = engine._match_keywords("Deiivery Note N0 45871\n\nQty: 2")
+    assert decision.verdict == VERDICT_YES
+    assert "similarity" in decision.reason
+
+
+def test_fuzzy_match_ignores_case_and_hyphens():
+    engine = SplitEngine(no_need_fields=["DELIVERY-NOTE-NO"])
+    decision = engine._match_keywords("please find the delivery note no below")
+    assert decision.verdict == VERDICT_YES
+
+
+def test_no_match_means_page_is_needed():
+    engine = SplitEngine(no_need_fields=["delivery-note-no"])
+    decision = engine._match_keywords("Tax Invoice\nTotal Amount: 100.00 AED")
+    assert decision.verdict == VERDICT_NO
+    assert decision.raw_reply == ""
+
+
+def test_best_keyword_wins():
+    engine = SplitEngine(
+        no_need_fields=["supplier-address", "delivery-address"]
+    )
+    decision = engine._match_keywords("Supplier Address: Dubai, UAE")
+    assert decision.verdict == VERDICT_YES
+    assert decision.raw_reply == "matched 'supplier-address'"
