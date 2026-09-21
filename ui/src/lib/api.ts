@@ -6,10 +6,27 @@ export interface InputFile {
 }
 
 export interface PageEntry {
+  kind: "page";
   name: string;
   image: string;
   record: PageRecord;
 }
+
+export interface DocumentRecord extends PageRecord {
+  file?: string;
+  pages?: number[];
+  page_count?: number;
+  page_records?: PageRecord[];
+}
+
+export interface DocumentEntry {
+  kind: "document";
+  name: string;
+  pdf: string;
+  record: DocumentRecord;
+}
+
+export type BucketItem = PageEntry | DocumentEntry;
 
 export interface PageRecord {
   document?: string;
@@ -47,12 +64,16 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export async function listBucket(
   bucket: Bucket,
-): Promise<{ items: InputFile[] | PageEntry[] }> {
+): Promise<{ items: InputFile[] | BucketItem[] }> {
   return request(`/api/buckets/${bucket}`);
 }
 
 export function imageUrl(bucket: Bucket, image: string): string {
   return `/api/image/${bucket}/${encodeURIComponent(image)}`;
+}
+
+export function pdfUrl(bucket: Bucket, pdf: string): string {
+  return `/api/pdf/${bucket}/${pdf.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 export async function uploadFiles(files: File[]): Promise<{ saved: string[] }> {

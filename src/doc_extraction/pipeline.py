@@ -26,10 +26,12 @@ import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 from PIL import Image
+from pypdf import PdfReader, PdfWriter
 
 from src.doc_extraction import config
 from src.doc_extraction.layers.conversion import ImageConversionLayer
 from src.doc_extraction.layers.extraction import ExtractionEngine
+from src.doc_extraction.layers.grouping import group_pages_by_value
 from src.doc_extraction.layers.preprocessing import preprocess_page_bytes
 from src.doc_extraction.layers.quality import QualityAssessmentEngine
 from src.doc_extraction.layers.router import ModelRouter
@@ -60,6 +62,9 @@ class Pipeline:
         self.router = ModelRouter()
         self.extractor = ExtractionEngine()
         self.split_engine = SplitEngine(no_need_fields=config.NO_NEED_PAGE_FIELDS)
+        self.multi_doc_field = (
+            config.MULTI_DOC_FIELDS[0] if config.MULTI_DOC_FIELDS else None
+        )
         self.preprocess_pool = preprocess_pool
         self.assess_pool = assess_pool
         self.page_semaphore = page_semaphore
@@ -129,36 +134,49 @@ class Pipeline:
         extractions = dict(zip(needed_indices, extracted))
 
         pad = max(1, len(str(result.page_count)))
+        skipped_count = 0
+        review_count = 0
         for page_number, split_decision in enumerate(split_decisions, start=1):
             index = page_number - 1
-            enhanced_bytes = preprocessed[index][0]
-            assessment = assessments[index]
             if split_decision.verdict == VERDICT_YES:
                 self._write_skipped_page(
                     result.source_pdf,
                     page_number,
                     pad,
-                    enhanced_bytes,
-                    assessment,
+                    preprocessed[index][0],
+                    assessments[index],
                     split_decision,
                 )
+                skipped_count += 1
             elif split_decision.verdict == VERDICT_UNCLEAR:
                 self._write_manual_review_page(
                     result.source_pdf,
                     page_number,
                     pad,
-                    enhanced_bytes,
-                    assessment,
+                    preprocessed[index][0],
+                    assessments[index],
                     split_decision,
                 )
-            else:
+                review_count += 1
+
+        if self.multi_doc_field:
+            document_count, grouped_review = self._write_multi_doc_results(
+                result.source_pdf, pad, needed_indices, extractions
+            )
+            review_count += grouped_review
+            logger.info("  -> %d document PDF(s) written", document_count)
+        else:
+            for index in needed_indices:
                 enhanced_bytes, assessment, extraction = extractions[index]
                 self._write_page(
-                    result.source_pdf, page_number, pad, enhanced_bytes, assessment, extraction
+                    result.source_pdf,
+                    index + 1,
+                    pad,
+                    enhanced_bytes,
+                    assessment,
+                    extraction,
                 )
 
-        skipped_count = sum(1 for d in split_decisions if d.verdict == VERDICT_YES)
-        review_count = sum(1 for d in split_decisions if d.verdict == VERDICT_UNCLEAR)
         logger.info(
             "  -> OK: %d page(s) in %.2fs (%d extracted, %d skipped, %d manual-review)",
             result.page_count,
@@ -337,6 +355,105 @@ class Pipeline:
             "     %s | unclear split reply -> %s",
             base_name,
             config.MANUAL_REVIEW_DIR,
+        )
+
+
+    def _write_multi_doc_results(
+        self,
+        source_pdf,
+        pad: int,
+        needed_indices: list[int],
+        extractions: dict,
+    ) -> tuple[int, int]:
+        page_data: dict[int, tuple] = {}
+        values: dict[int, object] = {}
+        for index in needed_indices:
+            page_number = index + 1
+            enhanced_bytes, assessment, extraction = extractions[index]
+            page_data[page_number] = (enhanced_bytes, assessment, extraction)
+            raw = extraction.helper_values.get(self.multi_doc_field)
+            values[page_number] = raw.strip() if isinstance(raw, str) else raw
+
+        grouping = group_pages_by_value(values)
+
+        for document_index, document in enumerate(grouping.documents, start=1):
+            self._write_document(source_pdf, document_index, document, page_data)
+
+        for page_number in grouping.manual_review:
+            enhanced_bytes, assessment, extraction = page_data[page_number]
+            decision = SplitDecision(
+                verdict=VERDICT_UNCLEAR,
+                raw_reply="document grouping",
+                reason=(
+                    "ambiguous document position - helper value missing "
+                    "or conflicting with surrounding pages"
+                ),
+            )
+            self._write_manual_review_page(
+                source_pdf, page_number, pad, enhanced_bytes, assessment, decision
+            )
+        return len(grouping.documents), len(grouping.manual_review)
+
+    def _write_document(
+        self,
+        source_pdf,
+        document_index: int,
+        document,
+        page_data: dict[int, tuple],
+    ) -> None:
+        stem = source_pdf.stem
+        directory = config.OUTPUT_DIR / stem
+        directory.mkdir(parents=True, exist_ok=True)
+        pdf_name = f"invoice-{document_index}.pdf"
+
+        reader = PdfReader(source_pdf)
+        writer = PdfWriter()
+        for page_number in document.pages:
+            writer.add_page(reader.pages[page_number - 1])
+        with (directory / pdf_name).open("wb") as handle:
+            writer.write(handle)
+
+        page_records = []
+        for page_number in document.pages:
+            _enhanced_bytes, assessment, extraction = page_data[page_number]
+            confidence_values = list(extraction.confidence_scores.values())
+            overall_confidence = (
+                round(sum(confidence_values) / len(confidence_values), 1)
+                if confidence_values
+                else 0.0
+            )
+            record = {
+                "page": page_number,
+                "quality_score": assessment.score,
+                "quality_tier": assessment.tier,
+                "model_used": extraction.model,
+                "extracted_fields": extraction.fields,
+                "field_confidence_scores": extraction.confidence_scores,
+                "confidence_score": overall_confidence,
+                "extraction_success": extraction.success,
+                "processing_time_seconds": extraction.processing_time,
+            }
+            if extraction.error:
+                record["error"] = extraction.error
+            page_records.append(record)
+
+        document_record = {
+            "document": source_pdf.name,
+            "file": pdf_name,
+            "pages": document.pages,
+            "page_count": len(document.pages),
+            "page_records": page_records,
+        }
+        (directory / f"invoice-{document_index}.json").write_text(
+            json.dumps(document_record, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        logger.info(
+            "     %s/%s | %d page(s) -> %s",
+            stem,
+            pdf_name,
+            len(document.pages),
+            document.pages,
         )
 
 

@@ -11,6 +11,12 @@
     "delivery-note-no": "",
     "supplier-address":"",
     "delivery-address":"",
-    "delivery-information":""
+    "delivery-information":"",
+    "item-code":""
+  },
+  "multiple-docs" : {
+    "same-words-every-pages":{
+      "invoice_number":""
+    }
   }
 }

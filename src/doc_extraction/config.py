@@ -92,6 +92,25 @@ def _load_no_need_page_fields(path: Path) -> list[str]:
 
 NO_NEED_PAGE_FIELDS = _load_no_need_page_fields(TEMPLATE_PATH)
 
+
+def _load_multi_doc_fields(path: Path) -> list[str]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    block = data.get("multiple-docs") or {}
+    fields = block.get("same-words-every-pages") if isinstance(block, dict) else None
+    if isinstance(fields, dict):
+        return [str(name) for name in fields]
+    if isinstance(fields, list):
+        return [str(name) for name in fields]
+    return []
+
+
+MULTI_DOC_FIELDS = _load_multi_doc_fields(TEMPLATE_PATH)
+
 # --- Split gate (page relevance) --------------------------------------------
 # The gate matches no_need_page keywords locally (no model call).
 # Reserved for an optional future model fallback on borderline pages.

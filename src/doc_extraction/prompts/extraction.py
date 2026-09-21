@@ -37,7 +37,10 @@ _GROUNDING_RULES = (
 )
 
 
-def build_extraction_prompt(template_fields: list[str] | None = None) -> str:
+def build_extraction_prompt(
+    template_fields: list[str] | None = None,
+    helper_fields: list[str] | None = None,
+) -> str:
     """Build the extraction prompt, optionally locked to template fields."""
     if template_fields:
         field_list = ", ".join(f'"{name}"' for name in template_fields)
@@ -66,10 +69,25 @@ def build_extraction_prompt(template_fields: list[str] | None = None) -> str:
             "the page contains no meaningful fields, return exactly: {}. "
         )
 
+    helper_rule = ""
+    extra_helpers = [
+        name for name in (helper_fields or []) if name not in (template_fields or [])
+    ]
+    if extra_helpers:
+        helper_list = ", ".join(f'"{name}"' for name in extra_helpers)
+        helper_rule = (
+            "ADDITIONALLY, for internal document grouping, extract these "
+            f"helper fields in the same JSON object, same format: "
+            f"{helper_list}. "
+            "Copy each helper value exactly as printed on the page; if it "
+            'is not visible, set its "value" to null. '
+        )
+
     return (
         "You are a document data-extraction engine. Examine this document "
         "page image. "
         + scope
+        + helper_rule
         + 'Return ONLY a valid JSON object with this exact format: '
         '{"field_name": {"value": "extracted_value", "confidence": 85}}. '
         + _GROUNDING_RULES
@@ -78,4 +96,7 @@ def build_extraction_prompt(template_fields: list[str] | None = None) -> str:
     )
 
 
-EXTRACTION_PROMPT = build_extraction_prompt(config.TEMPLATE_FIELDS)
+EXTRACTION_PROMPT = build_extraction_prompt(
+    config.TEMPLATE_FIELDS,
+    config.MULTI_DOC_FIELDS,
+)

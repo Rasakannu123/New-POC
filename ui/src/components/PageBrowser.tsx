@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowLeft, WarningCircle, MagnifyingGlass } from "@phosphor-icons/react";
+import {
+  ArrowLeft,
+  WarningCircle,
+  MagnifyingGlass,
+  FilePdf,
+} from "@phosphor-icons/react";
 import {
   type Bucket,
+  type BucketItem,
   type PageEntry,
   imageUrl,
   listBucket,
+  pdfUrl,
   tierLabel,
 } from "../lib/api";
 
@@ -135,17 +142,17 @@ export default function PageBrowser({
   emptyTitle,
   emptyHint,
 }: PageBrowserProps) {
-  const [items, setItems] = useState<PageEntry[]>([]);
+  const [items, setItems] = useState<BucketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<PageEntry | null>(null);
+  const [selected, setSelected] = useState<BucketItem | null>(null);
   const reduceMotion = useReducedMotion();
 
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
     listBucket(bucket)
-      .then((data) => setItems(data.items as PageEntry[]))
+      .then((data) => setItems(data.items as BucketItem[]))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [bucket]);
@@ -176,6 +183,57 @@ export default function PageBrowser({
           </button>
         </div>
       </>
+    );
+  }
+
+  if (selected && selected.kind === "document") {
+    return (
+      <div>
+        <button
+          onClick={() => setSelected(null)}
+          className="mb-6 flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        >
+          <ArrowLeft size={16} />
+          Back to all documents
+        </button>
+
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+            <iframe
+              src={pdfUrl(bucket, selected.pdf)}
+              title={selected.name}
+              className="h-[80vh] w-full rounded-lg"
+            />
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h2 className="font-mono text-sm text-zinc-500 dark:text-zinc-400">
+                {selected.name}
+              </h2>
+              {typeof selected.record.page_count === "number" && (
+                <span className="mt-2 inline-block rounded-md bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  {selected.record.page_count} page(s)
+                </span>
+              )}
+            </div>
+
+            {(selected.record.page_records ?? []).map((pageRecord) => (
+              <section
+                key={pageRecord.page}
+                className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
+              >
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                  Page {pageRecord.page}
+                  {pageRecord.quality_score !== undefined &&
+                    ` - score ${pageRecord.quality_score}`}
+                </h3>
+                <FieldList record={pageRecord} />
+              </section>
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -267,27 +325,38 @@ export default function PageBrowser({
               }}
               className="group text-left"
             >
-              <div className="relative aspect-[3/4] overflow-hidden rounded-xl border border-zinc-200 bg-white transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-lg group-hover:shadow-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-900 dark:group-hover:shadow-black/40">
-                <img
-                  src={imageUrl(bucket, entry.image)}
-                  alt={`Page ${entry.name}`}
-                  loading="lazy"
-                  className="size-full object-cover"
-                />
-                <div className="absolute top-2 right-2">
-                  <ScoreBadge score={entry.record.quality_score} />
+              {entry.kind === "document" ? (
+                <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-lg group-hover:shadow-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-800/60 dark:group-hover:shadow-black/40">
+                  <div className="flex flex-col items-center gap-2">
+                    <FilePdf size={36} weight="duotone" className="text-rose-500" />
+                    <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                      {entry.record.page_count ?? "?"} pages
+                    </span>
+                  </div>
                 </div>
-                {entry.record.page_skipped && (
-                  <span className="absolute bottom-2 left-2 rounded-md bg-zinc-900/80 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm dark:bg-zinc-100/85 dark:text-zinc-900">
-                    skipped
-                  </span>
-                )}
-                {entry.record.manual_review && (
-                  <span className="absolute bottom-2 left-2 rounded-md bg-amber-500/90 px-2 py-0.5 text-[11px] text-white">
-                    review
-                  </span>
-                )}
-              </div>
+              ) : (
+                <div className="relative aspect-[3/4] overflow-hidden rounded-xl border border-zinc-200 bg-white transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-lg group-hover:shadow-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-900 dark:group-hover:shadow-black/40">
+                  <img
+                    src={imageUrl(bucket, entry.image)}
+                    alt={`Page ${entry.name}`}
+                    loading="lazy"
+                    className="size-full object-cover"
+                  />
+                  <div className="absolute top-2 right-2">
+                    <ScoreBadge score={entry.record.quality_score} />
+                  </div>
+                  {entry.record.page_skipped && (
+                    <span className="absolute bottom-2 left-2 rounded-md bg-zinc-900/80 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm dark:bg-zinc-100/85 dark:text-zinc-900">
+                      skipped
+                    </span>
+                  )}
+                  {entry.record.manual_review && (
+                    <span className="absolute bottom-2 left-2 rounded-md bg-amber-500/90 px-2 py-0.5 text-[11px] text-white">
+                      review
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="mt-3 flex items-center justify-between gap-2">
                 <p className="truncate text-sm font-medium">{entry.name}</p>
                 {entry.record.quality_tier && (
@@ -299,7 +368,11 @@ export default function PageBrowser({
                 )}
               </div>
               <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                {entry.record.model_used ?? entry.record.skip_reason ?? "No extraction"}
+                {entry.kind === "document"
+                  ? `Document - ${entry.record.page_count ?? "?"} page(s)`
+                  : entry.record.model_used ??
+                    entry.record.skip_reason ??
+                    "No extraction"}
               </p>
             </motion.button>
           ))}

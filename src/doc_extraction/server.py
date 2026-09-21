@@ -79,9 +79,45 @@ def list_bucket(bucket: str) -> dict:
             except json.JSONDecodeError:
                 record = {}
         items.append(
-            {"name": image_path.stem, "image": image_path.name, "record": record}
+            {
+                "kind": "page",
+                "name": image_path.stem,
+                "image": image_path.name,
+                "record": record,
+            }
         )
+
+    for subdirectory in sorted(path for path in directory.iterdir() if path.is_dir()):
+        for pdf_path in sorted(subdirectory.glob("*.pdf")):
+            record_path = pdf_path.with_suffix(".json")
+            record = {}
+            if record_path.is_file():
+                try:
+                    record = json.loads(record_path.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    record = {}
+            items.append(
+                {
+                    "kind": "document",
+                    "name": f"{subdirectory.name}/{pdf_path.stem}",
+                    "pdf": f"{subdirectory.name}/{pdf_path.name}",
+                    "record": record,
+                }
+            )
     return {"bucket": bucket, "items": items}
+
+
+@app.get("/api/pdf/{bucket}/{pdf_path:path}")
+def get_pdf(bucket: str, pdf_path: str) -> FileResponse:
+    directory = _bucket_dir(bucket).resolve()
+    candidate = (directory / pdf_path).resolve()
+    if (
+        directory not in candidate.parents
+        or not candidate.is_file()
+        or candidate.suffix.lower() != ".pdf"
+    ):
+        raise HTTPException(status_code=404, detail="pdf not found")
+    return FileResponse(candidate, media_type="application/pdf")
 
 
 @app.get("/api/image/{bucket}/{name}")
