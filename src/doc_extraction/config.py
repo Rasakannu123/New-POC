@@ -131,3 +131,7 @@ MAX_CONCURRENT_PAGES = _int("MAX_CONCURRENT_PAGES", 4)
 PREPROCESS_WORKERS = _int("PREPROCESS_WORKERS", 0) or (os.cpu_count() or 1)
 # Worker threads for the Tesseract subprocess calls in quality assessment.
 ASSESS_WORKERS = _int("ASSESS_WORKERS", 4)
+# Concurrent Tesseract processes allowed per OCR consumer (quality + split).
+OCR_CONCURRENCY = _int("OCR_CONCURRENCY", 4)
+
+os.environ.setdefault("OMP_THREAD_LIMIT", "1")

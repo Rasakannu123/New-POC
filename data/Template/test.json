@@ -8,15 +8,11 @@
     "buyer_name": ""
   },
   "no_need_page": {
-    "delivery-note-no": "",
-    "supplier-address":"",
-    "delivery-address":"",
-    "delivery-information":"",
-    "item-code":""
+    
   },
   "multiple-docs" : {
     "same-words-every-pages":{
-      "invoice_number":""
+      
     }
   }
 }

@@ -269,6 +269,7 @@ class Pipeline:
         enhanced_bytes: bytes,
         assessment,
         decision,
+        extraction=None,
     ) -> None:
         config.MANUAL_REVIEW_DIR.mkdir(parents=True, exist_ok=True)
         document_name = source_pdf.stem
@@ -290,6 +291,25 @@ class Pipeline:
             "confidence_score": 0.0,
             "extraction_success": False,
         }
+        if extraction is not None:
+            confidence_values = list(extraction.confidence_scores.values())
+            overall_confidence = (
+                round(sum(confidence_values) / len(confidence_values), 1)
+                if confidence_values
+                else 0.0
+            )
+            record.update(
+                {
+                    "model_used": extraction.model,
+                    "extracted_fields": extraction.fields,
+                    "field_confidence_scores": extraction.confidence_scores,
+                    "confidence_score": overall_confidence,
+                    "extraction_success": extraction.success,
+                    "processing_time_seconds": extraction.processing_time,
+                }
+            )
+            if extraction.error:
+                record["error"] = extraction.error
         json_name = f"{base_name}.json"
         (config.MANUAL_REVIEW_DIR / json_name).write_text(
             json.dumps(record, indent=2, ensure_ascii=False),
@@ -351,7 +371,13 @@ class Pipeline:
                 ),
             )
             self._write_manual_review_page(
-                source_pdf, page_number, pad, enhanced_bytes, assessment, decision
+                source_pdf,
+                page_number,
+                pad,
+                enhanced_bytes,
+                assessment,
+                decision,
+                extraction=extraction,
             )
         return len(grouping.documents), len(grouping.manual_review)
 

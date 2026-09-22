@@ -51,6 +51,9 @@ export interface PageRecord {
 export interface Template {
   extracted_fields: Record<string, string>;
   no_need_page: Record<string, string>;
+  "multiple-docs"?: {
+    "same-words-every-pages": Record<string, string>;
+  };
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {

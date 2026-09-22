@@ -190,6 +190,25 @@ export default function TemplatePage() {
             })
           }
         />
+        <FieldListEditor
+          title="Multiple documents (grouping)"
+          hint="Pages sharing the same value of the first field are joined into one PDF. Empty means grouping is off and the whole file becomes one document."
+          names={Object.keys(
+            template["multiple-docs"]?.["same-words-every-pages"] ?? {},
+          )}
+          onChange={(names) =>
+            setTemplate({
+              ...template,
+              "multiple-docs": {
+                "same-words-every-pages": Object.fromEntries(
+                  names
+                    .filter((name) => name.trim() !== "")
+                    .map((name) => [name, ""]),
+                ),
+              },
+            })
+          }
+        />
       </div>
     </div>
   );

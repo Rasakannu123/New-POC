@@ -27,6 +27,8 @@ from difflib import SequenceMatcher
 
 from PIL import Image
 
+from src.doc_extraction import config
+
 logger = logging.getLogger(__name__)
 
 VERDICT_YES = "yes"
@@ -66,7 +68,7 @@ class SplitEngine:
         self.enabled = bool(self.no_need_fields)
         self.ocr_config = ocr_config
         self._pytesseract = None
-        self._ocr_lock = threading.Lock()
+        self._ocr_semaphore = threading.Semaphore(config.OCR_CONCURRENCY)
         self._init_ocr()
 
     def classify(self, image: Image.Image) -> SplitDecision:
@@ -83,7 +85,7 @@ class SplitEngine:
         return self._match_keywords(page_text)
 
     def _ocr_text(self, image: Image.Image) -> str:
-        with self._ocr_lock:
+        with self._ocr_semaphore:
             return self._pytesseract.image_to_string(image, config=self.ocr_config)
 
     def _match_keywords(self, page_text: str) -> SplitDecision:

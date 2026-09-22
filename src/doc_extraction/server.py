@@ -154,7 +154,11 @@ def upload(files: list[UploadFile] = File(...)) -> dict:
 @app.get("/api/template")
 def get_template() -> dict:
     if not config.TEMPLATE_PATH.is_file():
-        return {"extracted_fields": {}, "no_need_page": {}}
+        return {
+            "extracted_fields": {},
+            "no_need_page": {},
+            "multiple-docs": {"same-words-every-pages": {}},
+        }
     return json.loads(config.TEMPLATE_PATH.read_text(encoding="utf-8"))
 
 
@@ -201,14 +205,27 @@ def process_status() -> dict:
 def put_template(data: dict) -> dict:
     extracted = data.get("extracted_fields")
     no_need = data.get("no_need_page")
+    multi_docs = data.get("multiple-docs") or {}
+    same_words = (
+        multi_docs.get("same-words-every-pages")
+        if isinstance(multi_docs, dict)
+        else None
+    )
     if not isinstance(extracted, dict) or not isinstance(no_need, dict):
         raise HTTPException(
             status_code=422,
             detail="expected 'extracted_fields' and 'no_need_page' objects",
         )
+    if isinstance(same_words, list):
+        same_words = {str(name): "" for name in same_words}
+    if not isinstance(same_words, dict):
+        same_words = {}
     payload = {
         "extracted_fields": {str(key): "" for key in extracted},
         "no_need_page": {str(key): "" for key in no_need},
+        "multiple-docs": {
+            "same-words-every-pages": {str(key): "" for key in same_words}
+        },
     }
     config.TEMPLATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     config.TEMPLATE_PATH.write_text(

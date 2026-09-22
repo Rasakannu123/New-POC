@@ -5,7 +5,7 @@ Calculates a 0-100 quality score for each enhanced page image.
 
     1. Focus          -> Laplacian variance (blur / sharpness)
     2. Content        -> Tesseract OCR overall page confidence
-    3. Quality Score  -> 40% Focus + 60% OCR confidence
+    3. Quality Score  -> 20% Focus + 80% OCR confidence
     4. Tier           -> clear / blurry / very_blurry
 
 Tier thresholds:
@@ -13,8 +13,9 @@ Tier thresholds:
     50-80  -> blurry
     < 50   -> very_blurry
 
-Thread safety: pytesseract is not reliably thread-safe, so all OCR calls
-are serialized behind an instance lock.
+Thread safety: pytesseract calls run in parallel up to config.OCR_CONCURRENCY,
+guarded by an instance semaphore; each call is an independent Tesseract
+subprocess.
 """
 
 from __future__ import annotations
@@ -28,6 +29,8 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 from PIL import Image
+
+from src.doc_extraction import config
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +63,8 @@ class QualityAssessmentEngine:
     ) -> None:
         self.weights = dict(
             weights or {
-                "focus": 0.40,
-                "ocr_confidence": 0.60,
+                "focus": 0.20,
+                "ocr_confidence": 0.80,
             }
         )
         self.clear_threshold = float(clear_threshold)
@@ -73,7 +76,7 @@ class QualityAssessmentEngine:
             raise ValueError("focus_scale must be > 0")
 
         self._pytesseract = None
-        self._ocr_lock = threading.Lock()
+        self._ocr_semaphore = threading.Semaphore(config.OCR_CONCURRENCY)
         self._init_ocr()
 
     def assess(self, image: Image.Image) -> QualityAssessment:
@@ -136,7 +139,7 @@ class QualityAssessmentEngine:
             }
 
         try:
-            with self._ocr_lock:
+            with self._ocr_semaphore:
                 data = self._pytesseract.image_to_data(
                     gray,
                     output_type=self._pytesseract.Output.DICT,
