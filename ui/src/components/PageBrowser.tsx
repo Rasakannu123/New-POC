@@ -9,6 +9,7 @@ import {
 import {
   type Bucket,
   type BucketItem,
+  type DocumentEntry,
   type PageEntry,
   imageUrl,
   listBucket,
@@ -16,13 +17,20 @@ import {
   tierLabel,
 } from "../lib/api";
 
-const META_KEYS: { key: keyof PageEntry["record"]; label: string }[] = [
+const META_KEYS: {
+  key: keyof (PageEntry["record"] & DocumentEntry["record"]);
+  label: string;
+}[] = [
   { key: "document", label: "Document" },
+  { key: "file", label: "File" },
   { key: "page", label: "Page" },
+  { key: "page_count", label: "Page count" },
   { key: "quality_score", label: "Quality score" },
   { key: "quality_tier", label: "Quality tier" },
   { key: "model_used", label: "Model" },
+  { key: "models_used", label: "Models" },
   { key: "confidence_score", label: "Overall confidence" },
+  { key: "extraction_success", label: "Extraction success" },
   { key: "processing_time_seconds", label: "Processing time" },
   { key: "skip_reason", label: "Skip reason" },
   { key: "split_reply", label: "Split reply" },
@@ -52,19 +60,22 @@ function ScoreBadge({ score }: { score: number | undefined }) {
   );
 }
 
-function MetaTable({ record }: { record: PageEntry["record"] }) {
+function MetaTable({ record }: { record: DocumentEntry["record"] }) {
   const rows = META_KEYS.filter((meta) => record[meta.key] !== undefined);
   if (rows.length === 0) return null;
   return (
     <dl className="divide-y divide-zinc-100 dark:divide-zinc-800">
-      {rows.map(({ key, label }) => (
-        <div key={key} className="flex items-baseline justify-between gap-4 py-2">
-          <dt className="text-xs text-zinc-500 dark:text-zinc-400">{label}</dt>
-          <dd className="max-w-[60%] truncate text-right font-mono text-xs text-zinc-800 dark:text-zinc-200">
-            {String(record[key])}
-          </dd>
-        </div>
-      ))}
+      {rows.map(({ key, label }) => {
+        const value = record[key];
+        return (
+          <div key={key} className="flex items-baseline justify-between gap-4 py-2">
+            <dt className="text-xs text-zinc-500 dark:text-zinc-400">{label}</dt>
+            <dd className="max-w-[60%] truncate text-right font-mono text-xs text-zinc-800 dark:text-zinc-200">
+              {Array.isArray(value) ? value.join(", ") : String(value)}
+            </dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }
@@ -218,19 +229,19 @@ export default function PageBrowser({
               )}
             </div>
 
-            {(selected.record.page_records ?? []).map((pageRecord) => (
-              <section
-                key={pageRecord.page}
-                className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-              >
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-                  Page {pageRecord.page}
-                  {pageRecord.quality_score !== undefined &&
-                    ` - score ${pageRecord.quality_score}`}
-                </h3>
-                <FieldList record={pageRecord} />
-              </section>
-            ))}
+            <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                Document metadata
+              </h3>
+              <MetaTable record={selected.record} />
+            </section>
+
+            <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                Extracted fields
+              </h3>
+              <FieldList record={selected.record} />
+            </section>
           </div>
         </div>
       </div>

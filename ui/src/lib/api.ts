@@ -16,7 +16,7 @@ export interface DocumentRecord extends PageRecord {
   file?: string;
   pages?: number[];
   page_count?: number;
-  page_records?: PageRecord[];
+  models_used?: string[];
 }
 
 export interface DocumentEntry {

@@ -31,9 +31,14 @@ from pypdf import PdfReader, PdfWriter
 from src.doc_extraction import config
 from src.doc_extraction.layers.conversion import ImageConversionLayer
 from src.doc_extraction.layers.extraction import ExtractionEngine
-from src.doc_extraction.layers.grouping import group_pages_by_value
+from src.doc_extraction.layers.grouping import DocumentGroup, group_pages_by_value
 from src.doc_extraction.layers.preprocessing import preprocess_page_bytes
-from src.doc_extraction.layers.quality import QualityAssessmentEngine
+from src.doc_extraction.layers.quality import (
+    QualityAssessmentEngine,
+    TIER_BLURRY,
+    TIER_CLEAR,
+    TIER_VERY_BLURRY,
+)
 from src.doc_extraction.layers.router import ModelRouter
 from src.doc_extraction.layers.split import (
     VERDICT_NO,
@@ -164,18 +169,11 @@ class Pipeline:
                 result.source_pdf, pad, needed_indices, extractions
             )
             review_count += grouped_review
-            logger.info("  -> %d document PDF(s) written", document_count)
         else:
-            for index in needed_indices:
-                enhanced_bytes, assessment, extraction = extractions[index]
-                self._write_page(
-                    result.source_pdf,
-                    index + 1,
-                    pad,
-                    enhanced_bytes,
-                    assessment,
-                    extraction,
-                )
+            document_count = self._write_single_doc_results(
+                result.source_pdf, needed_indices, extractions
+            )
+        logger.info("  -> %d document PDF(s) written", document_count)
 
         logger.info(
             "  -> OK: %d page(s) in %.2fs (%d extracted, %d skipped, %d manual-review)",
@@ -223,60 +221,6 @@ class Pipeline:
             return await asyncio.gather(*tasks)
         finally:
             await async_client.close()
-
-    def _write_page(
-        self,
-        source_pdf,
-        page_number: int,
-        pad: int,
-        enhanced_bytes: bytes,
-        assessment,
-        extraction,
-    ) -> None:
-        document_name = source_pdf.stem
-        base_name = f"{document_name}_{page_number:0{pad}d}"
-        image_name = f"{base_name}.{config.IMAGE_FORMAT}"
-        (config.OUTPUT_DIR / image_name).write_bytes(enhanced_bytes)
-
-        confidence_values = list(extraction.confidence_scores.values())
-        overall_confidence = (
-            round(sum(confidence_values) / len(confidence_values), 1)
-            if confidence_values
-            else 0.0
-        )
-
-        record = {
-            "document": source_pdf.name,
-            "page": page_number,
-            "image_file": image_name,
-            "quality_score": assessment.score,
-            "quality_tier": assessment.tier,
-            "model_used": extraction.model,
-            "extracted_fields": extraction.fields,
-            "field_confidence_scores": extraction.confidence_scores,
-            "confidence_score": overall_confidence,
-            "extraction_success": extraction.success,
-            "processing_time_seconds": extraction.processing_time,
-        }
-        if extraction.error:
-            record["error"] = extraction.error
-
-        json_name = f"{base_name}.json"
-        (config.OUTPUT_DIR / json_name).write_text(
-            json.dumps(record, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-
-        logger.info(
-            "     %s | score=%.1f tier=%s | model=%s | %d field(s) in %.1fs -> %s",
-            image_name,
-            assessment.score,
-            assessment.tier,
-            extraction.model,
-            len(extraction.fields),
-            extraction.processing_time,
-            json_name,
-        )
 
     def _write_skipped_page(
         self,
@@ -358,6 +302,21 @@ class Pipeline:
         )
 
 
+    @staticmethod
+    def _write_single_doc_results(
+        source_pdf,
+        needed_indices: list[int],
+        extractions: dict,
+    ) -> int:
+        page_data = {index + 1: extractions[index] for index in needed_indices}
+        if not page_data:
+            return 0
+        document = DocumentGroup(value=source_pdf.stem, pages=sorted(page_data))
+        Pipeline._write_document(
+            source_pdf, f"{source_pdf.stem}.pdf", document, page_data
+        )
+        return 1
+
     def _write_multi_doc_results(
         self,
         source_pdf,
@@ -377,7 +336,9 @@ class Pipeline:
         grouping = group_pages_by_value(values)
 
         for document_index, document in enumerate(grouping.documents, start=1):
-            self._write_document(source_pdf, document_index, document, page_data)
+            self._write_document(
+                source_pdf, f"invoice-{document_index}.pdf", document, page_data
+            )
 
         for page_number in grouping.manual_review:
             enhanced_bytes, assessment, extraction = page_data[page_number]
@@ -394,17 +355,16 @@ class Pipeline:
             )
         return len(grouping.documents), len(grouping.manual_review)
 
+    @staticmethod
     def _write_document(
-        self,
         source_pdf,
-        document_index: int,
+        pdf_name: str,
         document,
         page_data: dict[int, tuple],
     ) -> None:
         stem = source_pdf.stem
         directory = config.OUTPUT_DIR / stem
         directory.mkdir(parents=True, exist_ok=True)
-        pdf_name = f"invoice-{document_index}.pdf"
 
         reader = PdfReader(source_pdf)
         writer = PdfWriter()
@@ -413,38 +373,82 @@ class Pipeline:
         with (directory / pdf_name).open("wb") as handle:
             writer.write(handle)
 
-        page_records = []
+        page_data_flat = {
+            page_number: page_data[page_number][2] for page_number in document.pages
+        }
+        field_order: list[str] = list(config.TEMPLATE_FIELDS)
+        for extraction in page_data_flat.values():
+            for name in extraction.fields:
+                if name not in field_order:
+                    field_order.append(name)
+
+        merged_fields: dict = {}
+        merged_confidences: dict[str, int] = {}
+        for name in field_order:
+            for page_number in document.pages:
+                extraction = page_data_flat[page_number]
+                value = extraction.fields.get(name)
+                if isinstance(value, str) and not value.strip():
+                    value = None
+                if value is not None:
+                    merged_fields[name] = value
+                    merged_confidences[name] = extraction.confidence_scores.get(
+                        name, 0
+                    )
+                    break
+            else:
+                merged_fields[name] = None
+                merged_confidences[name] = 0
+
+        models_used: list[str] = []
+        total_time = 0.0
+        extraction_success = False
+        errors: list[str] = []
         for page_number in document.pages:
-            _enhanced_bytes, assessment, extraction = page_data[page_number]
-            confidence_values = list(extraction.confidence_scores.values())
-            overall_confidence = (
-                round(sum(confidence_values) / len(confidence_values), 1)
-                if confidence_values
-                else 0.0
-            )
-            record = {
-                "page": page_number,
-                "quality_score": assessment.score,
-                "quality_tier": assessment.tier,
-                "model_used": extraction.model,
-                "extracted_fields": extraction.fields,
-                "field_confidence_scores": extraction.confidence_scores,
-                "confidence_score": overall_confidence,
-                "extraction_success": extraction.success,
-                "processing_time_seconds": extraction.processing_time,
-            }
+            extraction = page_data_flat[page_number]
+            if extraction.model and extraction.model not in models_used:
+                models_used.append(extraction.model)
+            total_time += extraction.processing_time
+            extraction_success = extraction_success or extraction.success
             if extraction.error:
-                record["error"] = extraction.error
-            page_records.append(record)
+                errors.append(f"page {page_number}: {extraction.error}")
+
+        quality_scores = [
+            page_data[page_number][1].score for page_number in document.pages
+        ]
+        quality_score = round(sum(quality_scores) / len(quality_scores), 1)
+        quality_tier = (
+            TIER_CLEAR
+            if quality_score > 80
+            else TIER_BLURRY
+            if quality_score >= 50
+            else TIER_VERY_BLURRY
+        )
+
+        confidence_values = list(merged_confidences.values())
+        overall_confidence = (
+            round(sum(confidence_values) / len(confidence_values), 1)
+            if confidence_values
+            else 0.0
+        )
 
         document_record = {
             "document": source_pdf.name,
             "file": pdf_name,
             "pages": document.pages,
             "page_count": len(document.pages),
-            "page_records": page_records,
+            "quality_score": quality_score,
+            "quality_tier": quality_tier,
+            "extracted_fields": merged_fields,
+            "field_confidence_scores": merged_confidences,
+            "confidence_score": overall_confidence,
+            "extraction_success": extraction_success,
+            "models_used": models_used,
+            "processing_time_seconds": round(total_time, 2),
         }
-        (directory / f"invoice-{document_index}.json").write_text(
+        if errors:
+            document_record["errors"] = errors
+        (directory / f"{pdf_name.removesuffix('.pdf')}.json").write_text(
             json.dumps(document_record, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
