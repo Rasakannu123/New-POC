@@ -20,4 +20,4 @@ data/Manual-Review/*
 # OS / editor
 Thumbs.db
 .DS_Store
-.vscode/
+.vscode/data/checkpoints.sqlite

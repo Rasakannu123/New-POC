@@ -201,6 +201,16 @@ def process_status() -> dict:
         return dict(_process_state)
 
 
+@app.get("/api/process/history/{thread_id}")
+def process_history(thread_id: str) -> dict:
+    from src.doc_extraction.pipeline_graph import load_checkpoint_history
+
+    try:
+        return {"thread_id": thread_id, "steps": load_checkpoint_history(thread_id)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}")
+
+
 @app.put("/api/template")
 def put_template(data: dict) -> dict:
     extracted = data.get("extracted_fields")

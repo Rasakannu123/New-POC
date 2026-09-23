@@ -518,10 +518,15 @@ def run() -> int:
 
     with ProcessPoolExecutor(max_workers=config.PREPROCESS_WORKERS) as preprocess_pool, \
             ThreadPoolExecutor(max_workers=config.ASSESS_WORKERS) as assess_pool:
-        pipeline = Pipeline(preprocess_pool, assess_pool, config.MAX_CONCURRENT_PAGES)
+        if config.PIPELINE_MODE == "langgraph":
+            from src.doc_extraction.pipeline_graph import GraphPipeline
+
+            runner = GraphPipeline(preprocess_pool, assess_pool, config.MAX_CONCURRENT_PAGES)
+        else:
+            runner = Pipeline(preprocess_pool, assess_pool, config.MAX_CONCURRENT_PAGES)
 
         with ThreadPoolExecutor(max_workers=config.MAX_CONCURRENT_DOCUMENTS) as doc_pool:
-            futures = {doc_pool.submit(pipeline.process_pdf, pdf): pdf for pdf in pdf_files}
+            futures = {doc_pool.submit(runner.process_pdf, pdf): pdf for pdf in pdf_files}
             for future, pdf in futures.items():
                 try:
                     pages_done, _ = future.result()

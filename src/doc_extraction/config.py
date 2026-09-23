@@ -135,3 +135,13 @@ ASSESS_WORKERS = _int("ASSESS_WORKERS", 4)
 OCR_CONCURRENCY = _int("OCR_CONCURRENCY", 4)
 
 os.environ.setdefault("OMP_THREAD_LIMIT", "1")
+
+# --- Orchestration ----------------------------------------------------------
+# "langgraph" runs the StateGraph pipeline, "classic" the hand-written loop.
+PIPELINE_MODE = os.getenv("PIPELINE_MODE", "langgraph")
+# Checkpointer for the LangGraph state history: "sqlite" (persistent) or
+# "memory" (per process). History is queryable per document thread_id.
+CHECKPOINTER = os.getenv("CHECKPOINTER", "sqlite")
+CHECKPOINT_DB = Path(
+    os.getenv("CHECKPOINT_DB") or PROJECT_ROOT / "data" / "checkpoints.sqlite"
+)

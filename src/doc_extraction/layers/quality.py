@@ -3,10 +3,9 @@ Quality Assessment Engine (Core Component #4)
 ---------------------------------------------
 Calculates a 0-100 quality score for each enhanced page image.
 
-    1. Focus          -> Laplacian variance (blur / sharpness)
-    2. Content        -> Tesseract OCR overall page confidence
-    3. Quality Score  -> 20% Focus + 80% OCR confidence
-    4. Tier           -> clear / blurry / very_blurry
+    1. Content        -> Tesseract OCR overall page confidence
+    2. Quality Score  -> OCR confidence only (Focus removed)
+    3. Tier           -> clear / blurry / very_blurry
 
 Tier thresholds:
     > 80   -> clear
@@ -21,12 +20,10 @@ subprocess.
 from __future__ import annotations
 
 import logging
-import math
 import shutil
 import threading
 from dataclasses import dataclass, field
 
-import cv2
 import numpy as np
 from PIL import Image
 
@@ -37,8 +34,6 @@ logger = logging.getLogger(__name__)
 TIER_CLEAR = "clear"
 TIER_BLURRY = "blurry"
 TIER_VERY_BLURRY = "very_blurry"
-
-_FOCUS_SCALE = 250.0
 
 
 @dataclass
@@ -51,29 +46,17 @@ class QualityAssessment:
 
 
 class QualityAssessmentEngine:
-    """Scores page-image quality using exactly two signals."""
+    """Scores page-image quality using Tesseract OCR confidence only."""
 
     def __init__(
         self,
-        weights: dict[str, float] | None = None,
         clear_threshold: float = 80.0,
         blurry_threshold: float = 50.0,
-        focus_scale: float = _FOCUS_SCALE,
         ocr_config: str = "--psm 3",
     ) -> None:
-        self.weights = dict(
-            weights or {
-                "focus": 0.20,
-                "ocr_confidence": 0.80,
-            }
-        )
         self.clear_threshold = float(clear_threshold)
         self.blurry_threshold = float(blurry_threshold)
-        self.focus_scale = float(focus_scale)
         self.ocr_config = ocr_config
-
-        if self.focus_scale <= 0:
-            raise ValueError("focus_scale must be > 0")
 
         self._pytesseract = None
         self._ocr_semaphore = threading.Semaphore(config.OCR_CONCURRENCY)
@@ -82,31 +65,16 @@ class QualityAssessmentEngine:
     def assess(self, image: Image.Image) -> QualityAssessment:
         gray = np.array(image.convert("L"))
 
-        focus = self._focus_score(gray)
         ocr_result = self._ocr_confidence_score(gray)
 
         metric_scores: dict[str, float] = {
-            "focus": focus,
             "ocr_confidence": ocr_result["score"],
             "ocr_word_count": ocr_result["word_count"],
             "ocr_char_count": ocr_result["char_count"],
             "ocr_mean_confidence": ocr_result["mean_confidence"],
         }
 
-        total_weight = (
-            self.weights.get("focus", 0.0)
-            + self.weights.get("ocr_confidence", 0.0)
-        )
-
-        if total_weight > 0:
-            score = (
-                focus * self.weights.get("focus", 0.0)
-                + ocr_result["score"] * self.weights.get("ocr_confidence", 0.0)
-            ) / total_weight
-        else:
-            score = 0.0
-
-        score = round(float(np.clip(score, 0.0, 100.0)), 1)
+        score = round(float(np.clip(ocr_result["score"], 0.0, 100.0)), 1)
 
         if score > self.clear_threshold:
             tier = TIER_CLEAR
@@ -123,11 +91,6 @@ class QualityAssessmentEngine:
                 for name, value in metric_scores.items()
             },
         )
-
-    def _focus_score(self, gray: np.ndarray) -> float:
-        variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-        score = 100.0 * (1.0 - math.exp(-variance / self.focus_scale))
-        return float(np.clip(score, 0.0, 100.0))
 
     def _ocr_confidence_score(self, gray: np.ndarray) -> dict[str, float]:
         if self._pytesseract is None:
