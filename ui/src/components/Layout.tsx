@@ -7,6 +7,7 @@ import {
   SkipForward,
   SlidersHorizontal,
   Sparkle,
+  Coins,
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { checkHealth } from "../lib/api";
@@ -17,6 +18,7 @@ const NAV_ITEMS: { to: string; label: string; icon: JSX.Element }[] = [
   { to: "/review", label: "Manual Review", icon: <WarningCircle size={18} weight="duotone" /> },
   { to: "/skipped", label: "Skipped", icon: <SkipForward size={18} weight="duotone" /> },
   { to: "/template", label: "Template", icon: <SlidersHorizontal size={18} weight="duotone" /> },
+  { to: "/costs", label: "Cost Tracker", icon: <Coins size={18} weight="duotone" /> },
 ];
 
 export default function Layout() {

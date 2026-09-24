@@ -24,6 +24,13 @@ def _int(name: str, default: int) -> int:
         return default
 
 
+def _float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
 # --- Gateway connection ---------------------------------------------------
 API_KEY = os.getenv("API_KEY", "")
 BASE_URL = os.getenv("BASE_URL", "")
@@ -42,6 +49,41 @@ TIER_MODEL_MAP = {
     "blurry": os.getenv("TIER_BLURRY_MODEL", MODEL_IMAGE_MEDIUM),
     "very_blurry": os.getenv("TIER_VERY_BLURRY_MODEL", MODEL_IMAGE_LARGE),
 }
+
+# --- Cost tracker: model pricing (USD per 1M tokens) -----------------------
+DEFAULT_PRICE_INPUT = _float("DEFAULT_PRICE_INPUT", 0.0)
+DEFAULT_PRICE_OUTPUT = _float("DEFAULT_PRICE_OUTPUT", 0.0)
+
+_DEFAULT_MODEL_PRICING = {
+    "mistralai/mistral-small-2603": {"input": 0.15, "output": 0.60},
+    "mistralai/mistral-medium-3.5": {"input": 1.50, "output": 7.50},
+    "mistralai/mistral-large-2512": {"input": 0.50, "output": 1.50},
+}
+
+
+def _pricing_alias(model: str) -> str:
+    return model.replace("/", "__").replace(".", "_").replace("-", "_")
+
+
+def _model_pricing() -> dict[str, dict[str, float]]:
+    pricing: dict[str, dict[str, float]] = {}
+    for model, rates in _DEFAULT_MODEL_PRICING.items():
+        alias = _pricing_alias(model)
+        input_rate = _float(f"PRICE_INPUT_{alias}", rates["input"])
+        output_rate = _float(f"PRICE_OUTPUT_{alias}", rates["output"])
+        pricing[model] = {"input": input_rate, "output": output_rate}
+    return pricing
+
+
+MODEL_PRICING = _model_pricing()
+
+
+def model_pricing(model: str) -> dict[str, float]:
+    """Input/output USD per 1M tokens for a model (defaults if unknown)."""
+    return MODEL_PRICING.get(
+        model,
+        {"input": DEFAULT_PRICE_INPUT, "output": DEFAULT_PRICE_OUTPUT},
+    )
 
 # --- Pipeline settings -----------------------------------------------------
 DPI = _int("DPI", 300)
@@ -113,8 +155,6 @@ MULTI_DOC_FIELDS = _load_multi_doc_fields(TEMPLATE_PATH)
 
 # --- Split gate (page relevance) --------------------------------------------
 # The gate matches no_need_page keywords locally (no model call).
-# Reserved for an optional future model fallback on borderline pages.
-SPLIT_MODEL = os.getenv("SPLIT_MODEL", "qwen/qwen-plus-2025-07-28:free")
 # Pages with an unclear split verdict are parked here for manual review.
 MANUAL_REVIEW_DIR = Path(
     os.getenv("MANUAL_REVIEW_DIR") or PROJECT_ROOT / "data" / "Manual-Review"
@@ -135,13 +175,3 @@ ASSESS_WORKERS = _int("ASSESS_WORKERS", 4)
 OCR_CONCURRENCY = _int("OCR_CONCURRENCY", 4)
 
 os.environ.setdefault("OMP_THREAD_LIMIT", "1")
-
-# --- Orchestration ----------------------------------------------------------
-# "langgraph" runs the StateGraph pipeline, "classic" the hand-written loop.
-PIPELINE_MODE = os.getenv("PIPELINE_MODE", "langgraph")
-# Checkpointer for the LangGraph state history: "sqlite" (persistent) or
-# "memory" (per process). History is queryable per document thread_id.
-CHECKPOINTER = os.getenv("CHECKPOINTER", "sqlite")
-CHECKPOINT_DB = Path(
-    os.getenv("CHECKPOINT_DB") or PROJECT_ROOT / "data" / "checkpoints.sqlite"
-)

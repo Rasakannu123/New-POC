@@ -172,7 +172,7 @@ export default function TemplatePage() {
             setTemplate({
               ...template,
               extracted_fields: Object.fromEntries(
-                names.filter((name) => name.trim() !== "").map((name) => [name, ""]),
+                names.map((name) => [name, ""]),
               ),
             })
           }
@@ -185,7 +185,7 @@ export default function TemplatePage() {
             setTemplate({
               ...template,
               no_need_page: Object.fromEntries(
-                names.filter((name) => name.trim() !== "").map((name) => [name, ""]),
+                names.map((name) => [name, ""]),
               ),
             })
           }
@@ -201,9 +201,7 @@ export default function TemplatePage() {
               ...template,
               "multiple-docs": {
                 "same-words-every-pages": Object.fromEntries(
-                  names
-                    .filter((name) => name.trim() !== "")
-                    .map((name) => [name, ""]),
+                  names.map((name) => [name, ""]),
                 ),
               },
             })

@@ -6,9 +6,13 @@ import {
   ArrowsClockwise,
   Cpu,
   CheckCircle,
+  Trash,
 } from "@phosphor-icons/react";
+import ConfirmDialog from "../components/ConfirmDialog";
 import {
   type InputFile,
+  clearBucket,
+  deleteInputFile,
   formatBytes,
   getProcessStatus,
   listBucket,
@@ -26,6 +30,10 @@ export default function DocumentsPage() {
   const [processing, setProcessing] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<InputFile | null>(null);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -191,9 +199,21 @@ export default function DocumentsPage() {
           </h2>
           <div className="flex items-center gap-3">
             {files.length > 0 && (
-              <span className="font-mono text-xs text-zinc-400">
-                {files.length} file{files.length === 1 ? "" : "s"}
-              </span>
+              <>
+                <span className="font-mono text-xs text-zinc-400">
+                  {files.length} file{files.length === 1 ? "" : "s"}
+                </span>
+                <button
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeletingAll(true);
+                  }}
+                  disabled={processing || deleting !== null}
+                  className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 active:scale-[0.98] disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+                >
+                  Delete all
+                </button>
+              </>
             )}
             <button
               onClick={handleProcess}
@@ -241,11 +261,80 @@ export default function DocumentsPage() {
                 <span className="ml-auto shrink-0 font-mono text-xs text-zinc-400">
                   {formatBytes(file.size)}
                 </span>
+                <button
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleting(file);
+                  }}
+                  disabled={processing || deleting !== null}
+                  aria-label={`Delete ${file.name}`}
+                  className="shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+                >
+                  <Trash size={16} />
+                </button>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {deleteError && (
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+          <WarningCircle size={20} weight="duotone" />
+          {deleteError}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={deletingAll}
+        title="Delete all documents"
+        message={`All ${files.length} PDF(s) in the input folder will be permanently deleted. This cannot be undone.`}
+        confirmLabel="Delete all"
+        busy={deleteBusy}
+        onCancel={() => {
+          if (!deleteBusy) setDeletingAll(false);
+        }}
+        onConfirm={async () => {
+          setDeleteBusy(true);
+          try {
+            await clearBucket("input");
+            setDeletingAll(false);
+            await Promise.resolve(load());
+          } catch (err) {
+            setDeleteError(err instanceof Error ? err.message : String(err));
+          } finally {
+            setDeleteBusy(false);
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete document"
+        message={
+          deleting
+            ? `"${deleting.name}" will be removed from the input folder. It will no longer be processed.`
+            : ""
+        }
+        confirmLabel="Delete"
+        busy={deleteBusy}
+        onCancel={() => {
+          if (!deleteBusy) setDeleting(null);
+        }}
+        onConfirm={async () => {
+          if (!deleting) return;
+          setDeleteBusy(true);
+          try {
+            await deleteInputFile(deleting.name);
+            setDeleting(null);
+            await Promise.resolve(load());
+          } catch (err) {
+            setDeleteError(err instanceof Error ? err.message : String(err));
+          } finally {
+            setDeleteBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

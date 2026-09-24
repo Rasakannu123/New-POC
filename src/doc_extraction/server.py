@@ -10,6 +10,7 @@ the extraction template to the React app. Run from the project root:
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -19,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from src.doc_extraction import config
+from src.doc_extraction.cost import aggregate_records
 from src.doc_extraction.pipeline import run as run_pipeline
 
 app = FastAPI(title="DocExtract Console API")
@@ -50,6 +52,14 @@ def _safe_name(name: str) -> str:
     if name != Path(name).name or name in {".", ".."}:
         raise HTTPException(status_code=400, detail="invalid file name")
     return name
+
+
+def _read_json(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 @app.get("/api/health")
@@ -105,6 +115,85 @@ def list_bucket(bucket: str) -> dict:
                 }
             )
     return {"bucket": bucket, "items": items}
+
+
+@app.delete("/api/input/{name}")
+def delete_input_file(name: str) -> dict:
+    name = _safe_name(name)
+    path = _bucket_dir("input") / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="file not found")
+    path.unlink()
+    return {"deleted": name}
+
+
+@app.delete("/api/document/{bucket}/{stem}")
+def delete_document(bucket: str, stem: str) -> dict:
+    stem = _safe_name(stem)
+    directory = _bucket_dir(bucket) / stem
+    if not directory.is_dir():
+        raise HTTPException(status_code=404, detail="document not found")
+    shutil.rmtree(directory)
+    return {"deleted": stem}
+
+
+@app.delete("/api/page/{bucket}/{name}")
+def delete_page(bucket: str, name: str) -> dict:
+    name = _safe_name(name)
+    directory = _bucket_dir(bucket)
+    deleted = []
+    for suffix in (f".{config.IMAGE_FORMAT}", ".json"):
+        path = directory / f"{name}{suffix}"
+        if path.is_file():
+            path.unlink()
+            deleted.append(path.name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="page not found")
+    return {"deleted": deleted}
+
+
+@app.delete("/api/clear/{bucket}")
+def clear_bucket(bucket: str) -> dict:
+    directory = _bucket_dir(bucket)
+    removed = 0
+
+    for path in list(directory.iterdir()):
+        if path.is_dir():
+            shutil.rmtree(path)
+            removed += 1
+            continue
+        if not path.is_file():
+            continue
+        suffix = path.suffix.lower()
+        if bucket == "input":
+            if suffix == ".pdf":
+                path.unlink()
+                removed += 1
+        elif suffix in {f".{config.IMAGE_FORMAT}", ".json", ".pdf"}:
+            path.unlink()
+            removed += 1
+
+    return {"removed": removed}
+
+
+@app.get("/api/costs")
+def get_costs() -> dict:
+    records: list[dict] = []
+
+    output = _bucket_dir("output")
+    for subdirectory in sorted(path for path in output.iterdir() if path.is_dir()):
+        for record_path in sorted(subdirectory.glob("*.json")):
+            record = _read_json(record_path)
+            if record:
+                records.append(record)
+
+    review = _bucket_dir("review")
+    for record_path in sorted(review.glob("*.json")):
+        record = _read_json(record_path)
+        if record and "cost" in record:
+            records.append(record)
+
+    return aggregate_records(records)
 
 
 @app.get("/api/pdf/{bucket}/{pdf_path:path}")
@@ -201,16 +290,6 @@ def process_status() -> dict:
         return dict(_process_state)
 
 
-@app.get("/api/process/history/{thread_id}")
-def process_history(thread_id: str) -> dict:
-    from src.doc_extraction.pipeline_graph import load_checkpoint_history
-
-    try:
-        return {"thread_id": thread_id, "steps": load_checkpoint_history(thread_id)}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}")
-
-
 @app.put("/api/template")
 def put_template(data: dict) -> dict:
     extracted = data.get("extracted_fields")
@@ -231,10 +310,14 @@ def put_template(data: dict) -> dict:
     if not isinstance(same_words, dict):
         same_words = {}
     payload = {
-        "extracted_fields": {str(key): "" for key in extracted},
-        "no_need_page": {str(key): "" for key in no_need},
+        "extracted_fields": {
+            str(key): "" for key in extracted if str(key).strip()
+        },
+        "no_need_page": {str(key): "" for key in no_need if str(key).strip()},
         "multiple-docs": {
-            "same-words-every-pages": {str(key): "" for key in same_words}
+            "same-words-every-pages": {
+                str(key): "" for key in same_words if str(key).strip()
+            }
         },
     }
     config.TEMPLATE_PATH.parent.mkdir(parents=True, exist_ok=True)

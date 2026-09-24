@@ -1,11 +1,6 @@
 {
   "extracted_fields": {
-    "document_type": "",
-    "invoice_number": "",
-    "date": "",
-    "supplier_name": "",
-    "supplier_trn": "",
-    "buyer_name": ""
+    "invoice_number": ""
   },
   "no_need_page": {
     "delivery-note-no": "",
@@ -14,9 +9,9 @@
     "delivery-information":"",
     "item-code":""
   },
-  "multiple-docs" : {
-    "same-words-every-pages":{
-      "invoice_number":""
+  "multiple-docs": {
+    "same-words-every-pages": {
+      "invoice_number": ""
     }
   }
 }

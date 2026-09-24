@@ -17,6 +17,10 @@ export interface DocumentRecord extends PageRecord {
   pages?: number[];
   page_count?: number;
   models_used?: string[];
+  cost?: {
+    totals: ModelCostBucket;
+    by_model: Record<string, ModelCostBucket>;
+  };
 }
 
 export interface DocumentEntry {
@@ -112,6 +116,57 @@ export async function startProcess(): Promise<{ started: boolean }> {
 
 export async function getProcessStatus(): Promise<ProcessStatus> {
   return request("/api/process/status");
+}
+
+export interface ModelCostBucket {
+  input_tokens: number;
+  output_tokens: number;
+  input_cost: number;
+  output_cost: number;
+  total_cost: number;
+  input_rate?: number;
+  output_rate?: number;
+}
+
+export interface CostSummary {
+  totals: ModelCostBucket;
+  by_model: Record<string, ModelCostBucket>;
+  cost_blocks_scanned: number;
+}
+
+export async function deleteInputFile(name: string): Promise<void> {
+  await request(`/api/input/${encodeURIComponent(name)}`, { method: "DELETE" });
+}
+
+export async function deleteDocument(bucket: Bucket, stem: string): Promise<void> {
+  await request(`/api/document/${bucket}/${encodeURIComponent(stem)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function deletePage(bucket: Bucket, name: string): Promise<void> {
+  await request(`/api/page/${bucket}/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function clearBucket(bucket: Bucket): Promise<{ removed: number }> {
+  return request(`/api/clear/${bucket}`, { method: "DELETE" });
+}
+
+export async function getCosts(): Promise<CostSummary> {
+  return request("/api/costs");
+}
+
+export function formatUsd(value: number): string {
+  if (value === 0) return "$0";
+  if (value < 0.01) return `$${value.toFixed(6)}`;
+  if (value < 1) return `$${value.toFixed(4)}`;
+  return `$${value.toFixed(2)}`;
+}
+
+export function formatTokens(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
 }
 
 export async function checkHealth(): Promise<boolean> {

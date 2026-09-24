@@ -5,12 +5,19 @@ import {
   WarningCircle,
   MagnifyingGlass,
   FilePdf,
+  Trash,
 } from "@phosphor-icons/react";
+import ConfirmDialog from "./ConfirmDialog";
 import {
   type Bucket,
   type BucketItem,
   type DocumentEntry,
   type PageEntry,
+  clearBucket,
+  deleteDocument,
+  deletePage,
+  formatTokens,
+  formatUsd,
   imageUrl,
   listBucket,
   pdfUrl,
@@ -57,6 +64,65 @@ function ScoreBadge({ score }: { score: number | undefined }) {
     <span className="rounded-md bg-zinc-900/80 px-2 py-1 font-mono text-xs text-white backdrop-blur-sm dark:bg-zinc-100/85 dark:text-zinc-900">
       q{Math.round(score)}
     </span>
+  );
+}
+
+function rateLabel(rate: number | undefined): string {
+  if (rate === undefined) return "mixed";
+  return `$${rate}/1M`;
+}
+
+function CostSection({ record }: { record: DocumentEntry["record"] }) {
+  const cost = record.cost;
+  if (!cost) return null;
+  const models = Object.entries(cost.by_model);
+  const single = models.length === 1 ? models[0][1] : undefined;
+  return (
+    <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+        Cost
+      </h3>
+      <dl className="divide-y divide-zinc-100 dark:divide-zinc-800">
+        <div className="flex items-baseline justify-between gap-4 py-2">
+          <dt className="text-xs text-zinc-500 dark:text-zinc-400">Input</dt>
+          <dd className="font-mono text-xs text-zinc-800 dark:text-zinc-200">
+            {formatTokens(cost.totals.input_tokens)} x{" "}
+            {rateLabel(single?.input_rate)} = {formatUsd(cost.totals.input_cost)}
+          </dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-4 py-2">
+          <dt className="text-xs text-zinc-500 dark:text-zinc-400">Output</dt>
+          <dd className="font-mono text-xs text-zinc-800 dark:text-zinc-200">
+            {formatTokens(cost.totals.output_tokens)} x{" "}
+            {rateLabel(single?.output_rate)} ={" "}
+            {formatUsd(cost.totals.output_cost)}
+          </dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-4 py-2">
+          <dt className="text-xs font-medium text-zinc-700 dark:text-zinc-200">
+            Total
+          </dt>
+          <dd className="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+            {formatUsd(cost.totals.total_cost)}
+          </dd>
+        </div>
+        {models.length > 1 &&
+          models.map(([model, bucket]) => (
+            <div
+              key={model}
+              className="flex items-baseline justify-between gap-4 py-2"
+            >
+              <dt className="truncate font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
+                {model}
+              </dt>
+              <dd className="shrink-0 font-mono text-xs text-zinc-600 dark:text-zinc-300">
+                {rateLabel(bucket.input_rate)} / {rateLabel(bucket.output_rate)}{" "}
+                = {formatUsd(bucket.total_cost)}
+              </dd>
+            </div>
+          ))}
+      </dl>
+    </section>
   );
 }
 
@@ -157,6 +223,10 @@ export default function PageBrowser({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<BucketItem | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
 
   const load = useCallback(() => {
@@ -170,19 +240,88 @@ export default function PageBrowser({
 
   useEffect(load, [load]);
 
+  const handleDelete = async () => {
+    if (!selected) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      if (selected.kind === "document") {
+        await deleteDocument(bucket, selected.name.split("/")[0]);
+      } else {
+        await deletePage(bucket, selected.name);
+      }
+      setDeleteOpen(false);
+      setSelected(null);
+      load();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await clearBucket(bucket);
+      setDeleteAllOpen(false);
+      load();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const deleteTarget = selected
+    ? selected.kind === "document"
+      ? `This removes the whole document "${selected.name.split("/")[0]}" with all of its invoice PDFs and records.`
+      : `This removes "${selected.name}" (image and record) from this folder.`
+    : "";
+
   const header = (
-    <header className="mb-8">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      <p className="mt-1 max-w-[65ch] text-sm text-zinc-500 dark:text-zinc-400">
-        {description}
-      </p>
+    <header className="mb-8 flex items-start justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <p className="mt-1 max-w-[65ch] text-sm text-zinc-500 dark:text-zinc-400">
+          {description}
+        </p>
+      </div>
+      {items.length > 0 && !loading && (
+        <button
+          onClick={() => {
+            setDeleteError(null);
+            setDeleteAllOpen(true);
+          }}
+          className="flex shrink-0 items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium text-zinc-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 active:scale-[0.98] dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+        >
+          <Trash size={14} />
+          Delete all
+        </button>
+      )}
     </header>
+  );
+
+  const deleteAllDialog = (
+    <ConfirmDialog
+      open={deleteAllOpen}
+      title={`Delete all ${title.toLowerCase()}`}
+      message={`All ${items.length} item(s) in this folder will be permanently deleted. This cannot be undone.`}
+      confirmLabel="Delete all"
+      busy={deleteBusy}
+      onCancel={() => {
+        if (!deleteBusy) setDeleteAllOpen(false);
+      }}
+      onConfirm={handleDeleteAll}
+    />
   );
 
   if (error) {
     return (
       <>
         {header}
+        {deleteAllDialog}
         <div className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
           <WarningCircle size={20} weight="duotone" />
           <span>{error}</span>
@@ -200,13 +339,31 @@ export default function PageBrowser({
   if (selected && selected.kind === "document") {
     return (
       <div>
-        <button
-          onClick={() => setSelected(null)}
-          className="mb-6 flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        >
-          <ArrowLeft size={16} />
-          Back to all documents
-        </button>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <button
+            onClick={() => setSelected(null)}
+            className="flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            <ArrowLeft size={16} />
+            Back to all documents
+          </button>
+          <button
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteOpen(true);
+            }}
+            className="flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 active:scale-[0.98] dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+          >
+            <Trash size={14} />
+            Delete
+          </button>
+        </div>
+        {deleteError && (
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+            <WarningCircle size={18} weight="duotone" />
+            {deleteError}
+          </div>
+        )}
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
           <div className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
@@ -236,6 +393,8 @@ export default function PageBrowser({
               <MetaTable record={selected.record} />
             </section>
 
+            <CostSection record={selected.record} />
+
             <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
                 Extracted fields
@@ -244,6 +403,18 @@ export default function PageBrowser({
             </section>
           </div>
         </div>
+
+        <ConfirmDialog
+          open={deleteOpen}
+          title="Delete document"
+          message={deleteTarget}
+          confirmLabel="Delete"
+          busy={deleteBusy}
+          onCancel={() => {
+            if (!deleteBusy) setDeleteOpen(false);
+          }}
+          onConfirm={handleDelete}
+        />
       </div>
     );
   }
@@ -251,13 +422,31 @@ export default function PageBrowser({
   if (selected) {
     return (
       <div>
-        <button
-          onClick={() => setSelected(null)}
-          className="mb-6 flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        >
-          <ArrowLeft size={16} />
-          Back to all pages
-        </button>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <button
+            onClick={() => setSelected(null)}
+            className="flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            <ArrowLeft size={16} />
+            Back to all pages
+          </button>
+          <button
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteOpen(true);
+            }}
+            className="flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 active:scale-[0.98] dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+          >
+            <Trash size={14} />
+            Delete
+          </button>
+        </div>
+        {deleteError && (
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+            <WarningCircle size={18} weight="duotone" />
+            {deleteError}
+          </div>
+        )}
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
           <div className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
@@ -299,6 +488,18 @@ export default function PageBrowser({
             </section>
           </div>
         </div>
+
+        <ConfirmDialog
+          open={deleteOpen}
+          title="Delete page"
+          message={deleteTarget}
+          confirmLabel="Delete"
+          busy={deleteBusy}
+          onCancel={() => {
+            if (!deleteBusy) setDeleteOpen(false);
+          }}
+          onConfirm={handleDelete}
+        />
       </div>
     );
   }
@@ -306,6 +507,7 @@ export default function PageBrowser({
   return (
     <div>
       {header}
+      {deleteAllDialog}
 
       {loading ? (
         <div className="grid grid-cols-2 gap-6 md:grid-cols-3 xl:grid-cols-4">

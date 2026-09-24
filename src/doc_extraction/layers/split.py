@@ -11,8 +11,7 @@ fields.
     no match                              -> page needed (extraction)
     no OCR text                           -> Manual-Review folder
 
-The verdict is fully deterministic. SPLIT_MODEL in config is reserved for
-an optional future fallback on borderline pages (not used).
+The verdict is fully deterministic and local: no model call is made.
 """
 
 from __future__ import annotations

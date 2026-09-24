@@ -29,6 +29,7 @@ from PIL import Image
 from pypdf import PdfReader, PdfWriter
 
 from src.doc_extraction import config
+from src.doc_extraction.cost import cost_block
 from src.doc_extraction.layers.conversion import ImageConversionLayer
 from src.doc_extraction.layers.extraction import ExtractionEngine
 from src.doc_extraction.layers.grouping import DocumentGroup, group_pages_by_value
@@ -306,6 +307,19 @@ class Pipeline:
                     "confidence_score": overall_confidence,
                     "extraction_success": extraction.success,
                     "processing_time_seconds": extraction.processing_time,
+                    "cost": cost_block(
+                        [
+                            {
+                                "model": extraction.model,
+                                "input_tokens": getattr(
+                                    extraction, "input_tokens", 0
+                                ),
+                                "output_tokens": getattr(
+                                    extraction, "output_tokens", 0
+                                ),
+                            }
+                        ]
+                    ),
                 }
             )
             if extraction.error:
@@ -430,6 +444,7 @@ class Pipeline:
         total_time = 0.0
         extraction_success = False
         errors: list[str] = []
+        usages: list[dict] = []
         for page_number in document.pages:
             extraction = page_data_flat[page_number]
             if extraction.model and extraction.model not in models_used:
@@ -438,6 +453,13 @@ class Pipeline:
             extraction_success = extraction_success or extraction.success
             if extraction.error:
                 errors.append(f"page {page_number}: {extraction.error}")
+            usages.append(
+                {
+                    "model": extraction.model,
+                    "input_tokens": getattr(extraction, "input_tokens", 0),
+                    "output_tokens": getattr(extraction, "output_tokens", 0),
+                }
+            )
 
         quality_scores = [
             page_data[page_number][1].score for page_number in document.pages
@@ -458,6 +480,7 @@ class Pipeline:
             else 0.0
         )
 
+        cost = cost_block(usages)
         document_record = {
             "document": source_pdf.name,
             "file": pdf_name,
@@ -471,6 +494,7 @@ class Pipeline:
             "extraction_success": extraction_success,
             "models_used": models_used,
             "processing_time_seconds": round(total_time, 2),
+            "cost": cost,
         }
         if errors:
             document_record["errors"] = errors
@@ -518,15 +542,10 @@ def run() -> int:
 
     with ProcessPoolExecutor(max_workers=config.PREPROCESS_WORKERS) as preprocess_pool, \
             ThreadPoolExecutor(max_workers=config.ASSESS_WORKERS) as assess_pool:
-        if config.PIPELINE_MODE == "langgraph":
-            from src.doc_extraction.pipeline_graph import GraphPipeline
-
-            runner = GraphPipeline(preprocess_pool, assess_pool, config.MAX_CONCURRENT_PAGES)
-        else:
-            runner = Pipeline(preprocess_pool, assess_pool, config.MAX_CONCURRENT_PAGES)
+        pipeline = Pipeline(preprocess_pool, assess_pool, config.MAX_CONCURRENT_PAGES)
 
         with ThreadPoolExecutor(max_workers=config.MAX_CONCURRENT_DOCUMENTS) as doc_pool:
-            futures = {doc_pool.submit(runner.process_pdf, pdf): pdf for pdf in pdf_files}
+            futures = {doc_pool.submit(pipeline.process_pdf, pdf): pdf for pdf in pdf_files}
             for future, pdf in futures.items():
                 try:
                     pages_done, _ = future.result()

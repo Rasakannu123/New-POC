@@ -44,6 +44,8 @@ class ExtractionResult:
     fields: dict = field(default_factory=dict)
     confidence_scores: dict[str, int] = field(default_factory=dict)
     helper_values: dict = field(default_factory=dict)
+    input_tokens: int = 0
+    output_tokens: int = 0
     model: str = ""
     processing_time: float = 0.0
     success: bool = False
@@ -97,6 +99,7 @@ class ExtractionEngine:
             )
             raw = response.choices[0].message.content or ""
             result.raw_response = raw
+            self._capture_usage(response, result)
             fields, confidences = self._parse_json_object(raw)
             self._separate_helper_fields(fields, confidences, result)
             result.success = True
@@ -134,6 +137,7 @@ class ExtractionEngine:
             )
             raw = response.choices[0].message.content or ""
             result.raw_response = raw
+            self._capture_usage(response, result)
             fields, confidences = self._parse_json_object(raw)
             self._separate_helper_fields(fields, confidences, result)
             result.success = True
@@ -142,6 +146,14 @@ class ExtractionEngine:
             logger.error("Extraction failed (%s): %s", decision.model, exc)
         result.processing_time = round(time.perf_counter() - started, 2)
         return result
+
+    @staticmethod
+    def _capture_usage(response, result: ExtractionResult) -> None:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+        result.input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        result.output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
 
     def _separate_helper_fields(
         self, fields: dict, confidences: dict[str, int], result: ExtractionResult

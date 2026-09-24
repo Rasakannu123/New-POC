@@ -21,6 +21,8 @@ def _page_data(fields, confidences, model="m", success=True, error=None):
             success=success,
             processing_time=1.0,
             error=error,
+            input_tokens=0,
+            output_tokens=0,
         ),
     )
 
@@ -42,16 +44,22 @@ def test_feature_off_joins_all_pages_into_one_pdf(tmp_path, monkeypatch):
         0: _page_data(
             {"invoice_number": "123", "date": None},
             {"invoice_number": 90, "date": 0},
+            model="mistralai/mistral-small-2603",
         ),
         1: _page_data(
             {"invoice_number": None, "date": "2026-01-05"},
             {"invoice_number": 0, "date": 80},
+            model="mistralai/mistral-small-2603",
         ),
         2: _page_data(
             {"invoice_number": None, "date": None},
             {"invoice_number": 0, "date": 0},
+            model="mistralai/mistral-small-2603",
         ),
     }
+    for extraction in extractions.values():
+        extraction[2].input_tokens = 1_250
+        extraction[2].output_tokens = 350
 
     count = Pipeline._write_single_doc_results(src, [0, 1, 2], extractions)
 
@@ -66,6 +74,14 @@ def test_feature_off_joins_all_pages_into_one_pdf(tmp_path, monkeypatch):
     assert record["pages"] == [1, 2, 3]
     assert record["quality_score"] == 70.0
     assert record["quality_tier"] == "blurry"
+    assert record["cost"]["totals"]["input_tokens"] == 3_750
+    assert record["cost"]["totals"]["output_tokens"] == 1_050
+    assert record["cost"]["totals"]["input_cost"] == round(
+        3_750 * 0.15 / 1_000_000, 12
+    )
+    assert record["cost"]["totals"]["output_cost"] == round(
+        1_050 * 0.60 / 1_000_000, 12
+    )
     assert record["extracted_fields"]["invoice_number"] == "123"
     assert record["extracted_fields"]["date"] == "2026-01-05"
 
