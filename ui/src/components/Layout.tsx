@@ -2,6 +2,7 @@ import type { JSX } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   UploadSimple,
+  FlowArrow,
   FileText,
   WarningCircle,
   SkipForward,
@@ -14,6 +15,7 @@ import { checkHealth } from "../lib/api";
 
 const NAV_ITEMS: { to: string; label: string; icon: JSX.Element }[] = [
   { to: "/", label: "Documents", icon: <UploadSimple size={18} weight="duotone" /> },
+  { to: "/pipeline", label: "Pipeline", icon: <FlowArrow size={18} weight="duotone" /> },
   { to: "/extractions", label: "Extractions", icon: <FileText size={18} weight="duotone" /> },
   { to: "/review", label: "Manual Review", icon: <WarningCircle size={18} weight="duotone" /> },
   { to: "/skipped", label: "Skipped", icon: <SkipForward size={18} weight="duotone" /> },

@@ -10,6 +10,7 @@ the extraction template to the React app. Run from the project root:
 from __future__ import annotations
 
 import json
+import queue
 import shutil
 import threading
 import time
@@ -17,11 +18,17 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from src.doc_extraction import config
 from src.doc_extraction.cost import aggregate_records
 from src.doc_extraction.pipeline import run as run_pipeline
+from src.doc_extraction.pipeline_graph import (
+    RUN_EVENTS,
+    list_runs,
+    load_checkpoint_history,
+    read_run,
+)
 
 app = FastAPI(title="DocExtract Console API")
 
@@ -227,6 +234,75 @@ def get_record(bucket: str, name: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+@app.get("/api/runs")
+def get_runs() -> dict:
+    return {"runs": list_runs()}
+
+
+@app.get("/api/runs/{run_id}")
+def get_run(run_id: str) -> dict:
+    run_id = _safe_name(run_id)
+    record = read_run(run_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    return record
+
+
+@app.get("/api/runs/{run_id}/checkpoints")
+def get_run_checkpoints(run_id: str) -> dict:
+    run_id = _safe_name(run_id)
+    if read_run(run_id) is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    return {"checkpoints": load_checkpoint_history(run_id)}
+
+
+@app.get("/api/runs/{run_id}/stream")
+def stream_run(run_id: str) -> StreamingResponse:
+    run_id = _safe_name(run_id)
+    record = read_run(run_id)
+    replay, subscriber, closed = RUN_EVENTS.subscribe(run_id)
+    if record is None and not replay:
+        RUN_EVENTS.unsubscribe(run_id, subscriber)
+        raise HTTPException(status_code=404, detail="run not found")
+
+    def generate():
+        events = list(replay)
+        if closed and not events and record is not None:
+            events = [
+                {"type": "node", "run_id": run_id, "trace": trace}
+                for trace in record.get("trace", [])
+            ]
+            events.append(
+                {
+                    "type": "run_end",
+                    "run_id": run_id,
+                    "status": record.get("status"),
+                    "error": record.get("error"),
+                    "finished_at": record.get("finished_at"),
+                }
+            )
+        try:
+            for event in events:
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            while subscriber is not None:
+                try:
+                    event = subscriber.get(timeout=15)
+                except queue.Empty:
+                    yield ": ping\n\n"
+                    continue
+                if event is None:
+                    break
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        finally:
+            RUN_EVENTS.unsubscribe(run_id, subscriber)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
 @app.post("/api/upload")
 def upload(files: list[UploadFile] = File(...)) -> dict:
     directory = _bucket_dir("input")
@@ -256,6 +332,7 @@ _process_state: dict = {
     "last_exit_code": None,
     "error": None,
     "finished_at": None,
+    "batch_started_ts": 0.0,
 }
 _process_lock = threading.Lock()
 
@@ -280,6 +357,7 @@ def start_process() -> dict:
             raise HTTPException(status_code=409, detail="pipeline is already running")
         _process_state["running"] = True
         _process_state["error"] = None
+        _process_state["batch_started_ts"] = time.time()
     threading.Thread(target=_process_worker, daemon=True).start()
     return {"started": True}
 
@@ -287,7 +365,19 @@ def start_process() -> dict:
 @app.get("/api/process/status")
 def process_status() -> dict:
     with _process_lock:
-        return dict(_process_state)
+        state = dict(_process_state)
+    batch_started_ts = state.get("batch_started_ts") or 0.0
+    state["runs"] = [
+        {
+            "run_id": record.get("run_id", ""),
+            "document": record.get("document", ""),
+            "status": record.get("status", "running"),
+            "started_at": record.get("started_at", ""),
+        }
+        for record in list_runs()
+        if (record.get("started_ts") or 0.0) >= batch_started_ts
+    ]
+    return state
 
 
 @app.put("/api/template")

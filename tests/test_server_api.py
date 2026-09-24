@@ -4,7 +4,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from src.doc_extraction import server
+from src.doc_extraction import config, server
 
 
 def _client(monkeypatch, tmp_path):
@@ -133,6 +133,7 @@ def test_clear_skip_and_review(monkeypatch, tmp_path):
 
 
 def test_put_template_drops_blank_keys(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "TEMPLATE_PATH", tmp_path / "test.json")
     client = _client(monkeypatch, tmp_path)
     response = client.put(
         "/api/template",

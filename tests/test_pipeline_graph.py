@@ -1,85 +1,106 @@
 """Tests for the LangGraph orchestration wiring."""
 
 import asyncio
-import sqlite3
 
 from langgraph.graph import END, START, StateGraph
 
-from src.doc_extraction.pipeline_graph import GraphPipeline, PipelineState
+from src.doc_extraction.pipeline_graph import (
+    GraphPipeline,
+    PipelineState,
+    RunEventBus,
+    _next_or_finalize,
+    _traced,
+)
 
 
-def test_route_after_gate_routes_needed_pages_to_extract():
-    assert GraphPipeline._route_after_gate({"needed_indices": [0, 2]}) == "extract"
+def test_route_after_quarantine_routes_needed_pages_to_extract():
+    assert GraphPipeline._route_after_quarantine({"needed_indices": [0, 2]}) == "route"
 
 
-def test_route_after_gate_finalizes_when_nothing_needed():
-    assert GraphPipeline._route_after_gate({"needed_indices": []}) == "finalize"
-    assert GraphPipeline._route_after_gate({}) == "finalize"
+def test_route_after_quarantine_finalizes_when_nothing_needed():
+    assert GraphPipeline._route_after_quarantine({"needed_indices": []}) == "finalize"
+    assert GraphPipeline._route_after_quarantine({}) == "finalize"
 
 
-def test_route_after_convert_finalizes_on_error():
-    assert GraphPipeline._route_after_convert({"error": "boom"}) == "finalize"
-    assert GraphPipeline._route_after_convert({}) == "enhance"
-
-
-def test_route_after_extract_uses_grouping_mode():
+def test_route_after_quarantine_finalizes_on_error():
     assert (
-        GraphPipeline._route_after_extract({"multi_doc_field": "invoice_number"})
-        == "grouping"
+        GraphPipeline._route_after_quarantine({"error": "boom", "needed_indices": [0]})
+        == "finalize"
     )
-    assert GraphPipeline._route_after_extract({"multi_doc_field": None}) == "single"
 
 
-def test_compiled_stub_graph_runs_fan_out_and_join():
-    order: list[str] = []
+def test_next_or_finalize_skips_to_finalize_on_error():
+    route = _next_or_finalize("enhance")
+    assert route({}) == "enhance"
+    assert route({"error": "boom"}) == "finalize"
 
-    class StubState(dict):
-        value: int
 
-    def start_node(state):
-        order.append("start")
-        return {"value": state["value"] + 1}
+def _stub_graph(node):
+    builder = StateGraph(PipelineState)
+    builder.add_node("step", node)
+    builder.add_edge(START, "step")
+    builder.add_edge("step", END)
+    return builder.compile()
 
-    def branch_a(state):
-        order.append("a")
-        return {}
 
-    def branch_b(state):
-        order.append("b")
-        return {}
+def test_traced_node_records_start_input_output_end():
+    def node(state):
+        return {"page_count": state["page_count"] + 1}
 
-    def join_node(state):
-        order.append("join")
-        return {}
+    graph = _stub_graph(_traced("step", ("page_count",))(node))
 
-    builder = StateGraph(StubState)
-    builder.add_node("start", start_node)
-    builder.add_node("a", branch_a)
-    builder.add_node("b", branch_b)
-    builder.add_node("join", join_node)
-    builder.add_edge(START, "start")
-    builder.add_edge("start", "a")
-    builder.add_edge("start", "b")
-    builder.add_edge("a", "join")
-    builder.add_edge("b", "join")
-    builder.add_edge("join", END)
-    graph = builder.compile()
+    result = asyncio.run(graph.ainvoke({"page_count": 1, "trace": []}))
 
-    asyncio.run(graph.ainvoke({"value": 1}))
+    envelope = result["trace"][0]
+    assert envelope["node"] == "step"
+    assert envelope["seq"] == 1
+    assert envelope["status"] == "ok"
+    assert envelope["error"] is None
+    assert envelope["input"] == {"page_count": 1}
+    assert envelope["output"] == {"page_count": 2}
+    assert envelope["started_at"] <= envelope["ended_at"]
+    assert envelope["duration_s"] >= 0
 
-    assert order[0] == "start"
-    assert sorted(order[1:3]) == ["a", "b"]
-    assert order[3] == "join"
+
+def test_traced_node_records_errors_without_raising():
+    def node(state):
+        raise RuntimeError("boom")
+
+    graph = _stub_graph(_traced("step", ())(node))
+
+    result = asyncio.run(graph.ainvoke({"trace": []}))
+
+    envelope = result["trace"][0]
+    assert envelope["status"] == "error"
+    assert envelope["error"] == "RuntimeError: boom"
+    assert envelope["output"]["status"] == "failed"
+
+
+def test_graph_builds_with_every_pipeline_node():
+    pipeline = GraphPipeline()
+    nodes = set(pipeline.builder.nodes)
+    assert nodes == {
+        "ingest",
+        "convert",
+        "enhance",
+        "assess",
+        "gate",
+        "quarantine",
+        "route",
+        "extract",
+        "group",
+        "emit",
+        "finalize",
+    }
 
 
 def test_sqlite_checkpointer_works_with_async_stream(tmp_path):
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-    class StubState(dict):
-        value: int
-
-    builder = StateGraph(StubState)
-    builder.add_node("step", lambda state: {"value": state.get("value", 0) + 1})
+    builder = StateGraph(PipelineState)
+    builder.add_node(
+        "step", lambda state: {"page_count": state.get("page_count", 0) + 1}
+    )
     builder.add_edge(START, "step")
     builder.add_edge("step", END)
 
@@ -89,7 +110,7 @@ def test_sqlite_checkpointer_works_with_async_stream(tmp_path):
         ) as saver:
             graph = builder.compile(checkpointer=saver)
             await graph.ainvoke(
-                {"value": 1}, config={"configurable": {"thread_id": "doc-test"}}
+                {"page_count": 1}, config={"configurable": {"thread_id": "doc-test"}}
             )
             return [
                 snapshot
@@ -102,3 +123,24 @@ def test_sqlite_checkpointer_works_with_async_stream(tmp_path):
     assert len(history) >= 2
 
 
+def test_run_event_bus_replays_for_late_subscriber():
+    bus = RunEventBus()
+    bus.publish("run-1", {"type": "run_start"})
+    replay, subscriber, closed = bus.subscribe("run-1")
+    assert closed is False
+    assert replay == [{"type": "run_start"}]
+    bus.publish("run-1", {"type": "node"})
+    assert subscriber.get(timeout=1) == {"type": "node"}
+    bus.close("run-1")
+    assert subscriber.get(timeout=1) is None
+    bus.unsubscribe("run-1", subscriber)
+    _, _, closed = bus.subscribe("run-1")
+    assert closed is True
+
+
+def test_run_event_bus_unknown_run_is_closed():
+    bus = RunEventBus()
+    replay, subscriber, closed = bus.subscribe("nope")
+    assert closed is True
+    assert subscriber is None
+    assert replay == []

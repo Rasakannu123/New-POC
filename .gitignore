@@ -14,10 +14,17 @@ data/input/*
 data/output/*
 data/skip/*
 data/Manual-Review/*
+data/runs/*
 !data/input/.gitkeep
 !data/output/.gitkeep
+
+# Runtime state
+data/checkpoints.sqlite
+
+# Test caches
+.pytest_cache/
 
 # OS / editor
 Thumbs.db
 .DS_Store
-.vscode/data/checkpoints.sqlite
+.vscode/

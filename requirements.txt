@@ -22,3 +22,7 @@ pypdf>=4.0.0
 fastapi>=0.110.0
 uvicorn>=0.29.0
 python-multipart>=0.0.9
+
+# LangGraph orchestration (src/doc_extraction/pipeline_graph.py)
+langgraph>=0.2.0
+langgraph-checkpoint-sqlite>=2.0.0

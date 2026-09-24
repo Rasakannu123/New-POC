@@ -90,6 +90,13 @@ DPI = _int("DPI", 300)
 IMAGE_FORMAT = os.getenv("IMAGE_FORMAT", "png")
 POPPLER_PATH = os.getenv("POPPLER_PATH") or None
 
+# --- LangGraph checkpoints & run workspace ---------------------------------
+CHECKPOINTER = os.getenv("CHECKPOINTER", "sqlite")
+CHECKPOINT_DB = Path(
+    os.getenv("CHECKPOINT_DB") or PROJECT_ROOT / "data" / "checkpoints.sqlite"
+)
+RUNS_DIR = Path(os.getenv("RUNS_DIR") or PROJECT_ROOT / "data" / "runs")
+
 INPUT_DIR = Path(os.getenv("INPUT_DIR") or PROJECT_ROOT / "data" / "input")
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR") or PROJECT_ROOT / "data" / "output")
 

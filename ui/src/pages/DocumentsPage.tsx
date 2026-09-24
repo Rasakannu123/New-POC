@@ -9,8 +9,10 @@ import {
   Trash,
 } from "@phosphor-icons/react";
 import ConfirmDialog from "../components/ConfirmDialog";
+import ActiveRunsPanel from "../components/ActiveRunsPanel";
 import {
   type InputFile,
+  type ProcessStatus,
   clearBucket,
   deleteInputFile,
   formatBytes,
@@ -19,6 +21,7 @@ import {
   startProcess,
   uploadFiles,
 } from "../lib/api";
+import type { RunSummary } from "../lib/runs";
 
 export default function DocumentsPage() {
   const [files, setFiles] = useState<InputFile[]>([]);
@@ -30,6 +33,7 @@ export default function DocumentsPage() {
   const [processing, setProcessing] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  const [runs, setRuns] = useState<RunSummary[]>([]);
   const [deleting, setDeleting] = useState<InputFile | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -49,7 +53,10 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     getProcessStatus()
-      .then((status) => setProcessing(status.running))
+      .then((status: ProcessStatus) => {
+        setProcessing(status.running);
+        setRuns(status.runs ?? []);
+      })
       .catch(() => undefined);
   }, []);
 
@@ -58,6 +65,7 @@ export default function DocumentsPage() {
     const interval = setInterval(async () => {
       try {
         const status = await getProcessStatus();
+        setRuns(status.runs ?? []);
         if (!status.running) {
           setProcessing(false);
           if (status.error) {
@@ -81,6 +89,7 @@ export default function DocumentsPage() {
 
   const handleProcess = async () => {
     setProcessing(true);
+    setRuns([]);
     setStatusNote(null);
     setProcessError(null);
     try {
@@ -191,6 +200,8 @@ export default function DocumentsPage() {
           Pipeline is running - this can take around a minute per document.
         </p>
       )}
+
+      {processing && runs.length > 0 && <ActiveRunsPanel runs={runs} />}
 
       <section className="mt-10">
         <div className="mb-3 flex items-center justify-between">

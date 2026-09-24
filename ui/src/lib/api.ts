@@ -108,6 +108,12 @@ export interface ProcessStatus {
   last_exit_code: number | null;
   error: string | null;
   finished_at: number | null;
+  runs?: {
+    run_id: string;
+    document: string;
+    status: string;
+    started_at: string;
+  }[];
 }
 
 export async function startProcess(): Promise<{ started: boolean }> {
