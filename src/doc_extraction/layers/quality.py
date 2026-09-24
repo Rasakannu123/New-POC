@@ -3,9 +3,11 @@ Quality Assessment Engine (Core Component #4)
 ---------------------------------------------
 Calculates a 0-100 quality score for each enhanced page image.
 
-    1. Content        -> Tesseract OCR overall page confidence
-    2. Quality Score  -> OCR confidence only (Focus removed)
-    3. Tier           -> clear / blurry / very_blurry
+    1. Content        -> Tesseract per-word OCR confidence
+    2. Readable words -> confidence >= 30 (stamps, borders, handwriting dropped)
+    3. Quality Score  -> char-weighted mean of readable words
+                         x coverage factor (readable chars / 120)
+    4. Tier           -> clear / blurry / very_blurry
 
 Tier thresholds:
     > 80   -> clear
@@ -34,6 +36,9 @@ logger = logging.getLogger(__name__)
 TIER_CLEAR = "clear"
 TIER_BLURRY = "blurry"
 TIER_VERY_BLURRY = "very_blurry"
+
+READABLE_MIN_CONFIDENCE = 30.0
+COVERAGE_TARGET_CHARS = 120.0
 
 
 @dataclass
@@ -72,6 +77,8 @@ class QualityAssessmentEngine:
             "ocr_word_count": ocr_result["word_count"],
             "ocr_char_count": ocr_result["char_count"],
             "ocr_mean_confidence": ocr_result["mean_confidence"],
+            "ocr_readable_word_count": ocr_result["readable_word_count"],
+            "ocr_readable_char_count": ocr_result["readable_char_count"],
         }
 
         score = round(float(np.clip(ocr_result["score"], 0.0, 100.0)), 1)
@@ -99,6 +106,8 @@ class QualityAssessmentEngine:
                 "mean_confidence": 0.0,
                 "word_count": 0.0,
                 "char_count": 0.0,
+                "readable_word_count": 0.0,
+                "readable_char_count": 0.0,
             }
 
         try:
@@ -109,8 +118,10 @@ class QualityAssessmentEngine:
                     config=self.ocr_config,
                 )
 
-            confidences: list[float] = []
-            char_weights: list[int] = []
+            all_confidences: list[float] = []
+            all_char_weights: list[int] = []
+            readable_confidences: list[float] = []
+            readable_char_weights: list[int] = []
 
             for text, confidence in zip(
                 data.get("text", []),
@@ -128,35 +139,41 @@ class QualityAssessmentEngine:
                 char_count = len("".join(text.split()))
                 if char_count <= 0:
                     continue
-                confidences.append(float(np.clip(conf, 0.0, 100.0)))
-                char_weights.append(char_count)
+                clipped = float(np.clip(conf, 0.0, 100.0))
+                all_confidences.append(clipped)
+                all_char_weights.append(char_count)
+                if clipped >= READABLE_MIN_CONFIDENCE:
+                    readable_confidences.append(clipped)
+                    readable_char_weights.append(char_count)
 
-            word_count = len(confidences)
-            total_chars = sum(char_weights)
+            word_count = len(all_confidences)
+            total_chars = sum(all_char_weights)
+            readable_word_count = len(readable_confidences)
+            readable_chars = sum(readable_char_weights)
 
-            if word_count == 0 or total_chars == 0:
+            if readable_word_count == 0 or readable_chars == 0:
                 return {
                     "score": 0.0,
                     "mean_confidence": 0.0,
                     "word_count": float(word_count),
                     "char_count": float(total_chars),
+                    "readable_word_count": float(readable_word_count),
+                    "readable_char_count": float(readable_chars),
                 }
 
             mean_confidence = float(
-                np.average(confidences, weights=char_weights)
+                np.average(readable_confidences, weights=readable_char_weights)
             )
-            page_confidence = mean_confidence
-
-            if word_count == 1:
-                page_confidence *= 1.0 / 3.0
-            elif word_count == 2:
-                page_confidence *= 2.0 / 3.0
+            coverage = min(1.0, readable_chars / COVERAGE_TARGET_CHARS)
+            score = mean_confidence * coverage
 
             return {
-                "score": float(np.clip(page_confidence, 0.0, 100.0)),
+                "score": float(np.clip(score, 0.0, 100.0)),
                 "mean_confidence": float(np.clip(mean_confidence, 0.0, 100.0)),
                 "word_count": float(word_count),
                 "char_count": float(total_chars),
+                "readable_word_count": float(readable_word_count),
+                "readable_char_count": float(readable_chars),
             }
 
         except Exception as exc:
@@ -166,6 +183,8 @@ class QualityAssessmentEngine:
                 "mean_confidence": 0.0,
                 "word_count": 0.0,
                 "char_count": 0.0,
+                "readable_word_count": 0.0,
+                "readable_char_count": 0.0,
             }
 
     def _init_ocr(self) -> None:
