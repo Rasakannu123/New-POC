@@ -3,9 +3,10 @@ Quality Assessment Engine (Core Component #4)
 ---------------------------------------------
 Calculates a 0-100 quality score for each enhanced page image.
 
-    1. Focus          -> Laplacian variance (blur / sharpness)
-    2. Content        -> Tesseract OCR overall page confidence
-    3. Quality Score  -> 40% Focus + 60% OCR confidence
+    1. Content        -> Tesseract per-word OCR confidence
+    2. Readable words -> confidence >= 30 (stamps, borders, handwriting dropped)
+    3. Quality Score  -> char-weighted mean of readable words
+                         x coverage factor (readable chars / 120)
     4. Tier           -> clear / blurry / very_blurry
 
 Tier thresholds:
@@ -13,21 +14,22 @@ Tier thresholds:
     50-80  -> blurry
     < 50   -> very_blurry
 
-Thread safety: pytesseract is not reliably thread-safe, so all OCR calls
-are serialized behind an instance lock.
+Thread safety: pytesseract calls run in parallel up to config.OCR_CONCURRENCY,
+guarded by an instance semaphore; each call is an independent Tesseract
+subprocess.
 """
 
 from __future__ import annotations
 
 import logging
-import math
 import shutil
 import threading
 from dataclasses import dataclass, field
 
-import cv2
 import numpy as np
 from PIL import Image
+
+from src.doc_extraction import config
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,8 @@ TIER_CLEAR = "clear"
 TIER_BLURRY = "blurry"
 TIER_VERY_BLURRY = "very_blurry"
 
-_FOCUS_SCALE = 250.0
+READABLE_MIN_CONFIDENCE = 30.0
+COVERAGE_TARGET_CHARS = 120.0
 
 
 @dataclass
@@ -48,62 +51,37 @@ class QualityAssessment:
 
 
 class QualityAssessmentEngine:
-    """Scores page-image quality using exactly two signals."""
+    """Scores page-image quality using Tesseract OCR confidence only."""
 
     def __init__(
         self,
-        weights: dict[str, float] | None = None,
         clear_threshold: float = 80.0,
         blurry_threshold: float = 50.0,
-        focus_scale: float = _FOCUS_SCALE,
         ocr_config: str = "--psm 3",
     ) -> None:
-        self.weights = dict(
-            weights or {
-                "focus": 0.40,
-                "ocr_confidence": 0.60,
-            }
-        )
         self.clear_threshold = float(clear_threshold)
         self.blurry_threshold = float(blurry_threshold)
-        self.focus_scale = float(focus_scale)
         self.ocr_config = ocr_config
 
-        if self.focus_scale <= 0:
-            raise ValueError("focus_scale must be > 0")
-
         self._pytesseract = None
-        self._ocr_lock = threading.Lock()
+        self._ocr_semaphore = threading.Semaphore(config.OCR_CONCURRENCY)
         self._init_ocr()
 
     def assess(self, image: Image.Image) -> QualityAssessment:
         gray = np.array(image.convert("L"))
 
-        focus = self._focus_score(gray)
         ocr_result = self._ocr_confidence_score(gray)
 
         metric_scores: dict[str, float] = {
-            "focus": focus,
             "ocr_confidence": ocr_result["score"],
             "ocr_word_count": ocr_result["word_count"],
             "ocr_char_count": ocr_result["char_count"],
             "ocr_mean_confidence": ocr_result["mean_confidence"],
+            "ocr_readable_word_count": ocr_result["readable_word_count"],
+            "ocr_readable_char_count": ocr_result["readable_char_count"],
         }
 
-        total_weight = (
-            self.weights.get("focus", 0.0)
-            + self.weights.get("ocr_confidence", 0.0)
-        )
-
-        if total_weight > 0:
-            score = (
-                focus * self.weights.get("focus", 0.0)
-                + ocr_result["score"] * self.weights.get("ocr_confidence", 0.0)
-            ) / total_weight
-        else:
-            score = 0.0
-
-        score = round(float(np.clip(score, 0.0, 100.0)), 1)
+        score = round(float(np.clip(ocr_result["score"], 0.0, 100.0)), 1)
 
         if score > self.clear_threshold:
             tier = TIER_CLEAR
@@ -121,11 +99,6 @@ class QualityAssessmentEngine:
             },
         )
 
-    def _focus_score(self, gray: np.ndarray) -> float:
-        variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-        score = 100.0 * (1.0 - math.exp(-variance / self.focus_scale))
-        return float(np.clip(score, 0.0, 100.0))
-
     def _ocr_confidence_score(self, gray: np.ndarray) -> dict[str, float]:
         if self._pytesseract is None:
             return {
@@ -133,18 +106,22 @@ class QualityAssessmentEngine:
                 "mean_confidence": 0.0,
                 "word_count": 0.0,
                 "char_count": 0.0,
+                "readable_word_count": 0.0,
+                "readable_char_count": 0.0,
             }
 
         try:
-            with self._ocr_lock:
+            with self._ocr_semaphore:
                 data = self._pytesseract.image_to_data(
                     gray,
                     output_type=self._pytesseract.Output.DICT,
                     config=self.ocr_config,
                 )
 
-            confidences: list[float] = []
-            char_weights: list[int] = []
+            all_confidences: list[float] = []
+            all_char_weights: list[int] = []
+            readable_confidences: list[float] = []
+            readable_char_weights: list[int] = []
 
             for text, confidence in zip(
                 data.get("text", []),
@@ -162,35 +139,41 @@ class QualityAssessmentEngine:
                 char_count = len("".join(text.split()))
                 if char_count <= 0:
                     continue
-                confidences.append(float(np.clip(conf, 0.0, 100.0)))
-                char_weights.append(char_count)
+                clipped = float(np.clip(conf, 0.0, 100.0))
+                all_confidences.append(clipped)
+                all_char_weights.append(char_count)
+                if clipped >= READABLE_MIN_CONFIDENCE:
+                    readable_confidences.append(clipped)
+                    readable_char_weights.append(char_count)
 
-            word_count = len(confidences)
-            total_chars = sum(char_weights)
+            word_count = len(all_confidences)
+            total_chars = sum(all_char_weights)
+            readable_word_count = len(readable_confidences)
+            readable_chars = sum(readable_char_weights)
 
-            if word_count == 0 or total_chars == 0:
+            if readable_word_count == 0 or readable_chars == 0:
                 return {
                     "score": 0.0,
                     "mean_confidence": 0.0,
                     "word_count": float(word_count),
                     "char_count": float(total_chars),
+                    "readable_word_count": float(readable_word_count),
+                    "readable_char_count": float(readable_chars),
                 }
 
             mean_confidence = float(
-                np.average(confidences, weights=char_weights)
+                np.average(readable_confidences, weights=readable_char_weights)
             )
-            page_confidence = mean_confidence
-
-            if word_count == 1:
-                page_confidence *= 1.0 / 3.0
-            elif word_count == 2:
-                page_confidence *= 2.0 / 3.0
+            coverage = min(1.0, readable_chars / COVERAGE_TARGET_CHARS)
+            score = mean_confidence * coverage
 
             return {
-                "score": float(np.clip(page_confidence, 0.0, 100.0)),
+                "score": float(np.clip(score, 0.0, 100.0)),
                 "mean_confidence": float(np.clip(mean_confidence, 0.0, 100.0)),
                 "word_count": float(word_count),
                 "char_count": float(total_chars),
+                "readable_word_count": float(readable_word_count),
+                "readable_char_count": float(readable_chars),
             }
 
         except Exception as exc:
@@ -200,6 +183,8 @@ class QualityAssessmentEngine:
                 "mean_confidence": 0.0,
                 "word_count": 0.0,
                 "char_count": 0.0,
+                "readable_word_count": 0.0,
+                "readable_char_count": 0.0,
             }
 
     def _init_ocr(self) -> None:

@@ -17,6 +17,7 @@ from src.doc_extraction.layers.quality import (
     QualityAssessmentEngine,
 )
 from src.doc_extraction.layers.router import ModelRouter, RoutingDecision
+from src.doc_extraction.layers.split import SplitDecision, SplitEngine
 
 __all__ = [
     "ConversionResult",
@@ -29,4 +30,6 @@ __all__ = [
     "QualityAssessmentEngine",
     "ModelRouter",
     "RoutingDecision",
+    "SplitDecision",
+    "SplitEngine",
 ]

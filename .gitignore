@@ -7,14 +7,17 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.codegraph/
 
 # Runtime data folders - keep the folders, ignore the contents
 data/input/*
 data/output/*
+data/skip/*
+data/Manual-Review/*
 !data/input/.gitkeep
 !data/output/.gitkeep
 
 # OS / editor
 Thumbs.db
 .DS_Store
-.vscode/
+.vscode/data/checkpoints.sqlite

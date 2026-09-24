@@ -7,7 +7,9 @@ and extracts the top important fields and values as structured JSON.
     Enhanced image + RoutingDecision -> gateway vision model -> fields
 
 - Uses the OpenAI-compatible gateway from config (loaded from .env).
-- Only the top important "field: value" pairs are requested (max 10).
+- Extraction is locked to the configured template fields when
+  config.TEMPLATE_FIELDS is set; missing fields are returned as null.
+  Otherwise the top important fields are requested (max 10).
 - Images are downscaled to max 2048 px on the long side before sending.
 - Responses are parsed robustly (code fences stripped, first JSON object
   extracted). A failed page never stops the pipeline.
@@ -26,24 +28,13 @@ from dataclasses import dataclass, field
 
 from PIL import Image
 
+from src.doc_extraction import config
 from src.doc_extraction.layers.router import ModelRouter, RoutingDecision
+from src.doc_extraction.prompts import EXTRACTION_PROMPT
 
 logger = logging.getLogger(__name__)
 
 MAX_IMAGE_SIDE = 2048
-MAX_FIELDS = 10
-
-EXTRACTION_PROMPT = (
-    "You are a document data-extraction engine. Examine this document page "
-    f"image and extract ONLY the top most important fields and their values "
-    f"(at most {MAX_FIELDS} fields - e.g. document type, dates, names, "
-    "amounts, reference numbers, addresses). "
-    'Return ONLY a valid JSON object with this exact format: '
-    '{"field_name": {"value": "extracted_value", "confidence": 85}}. '
-    "The confidence must be an integer 0-100 indicating your certainty. "
-    "No markdown, no code fences, no explanations. "
-    'If the page contains no meaningful fields, return exactly: {}'
-)
 
 
 @dataclass
@@ -52,6 +43,9 @@ class ExtractionResult:
 
     fields: dict = field(default_factory=dict)
     confidence_scores: dict[str, int] = field(default_factory=dict)
+    helper_values: dict = field(default_factory=dict)
+    input_tokens: int = 0
+    output_tokens: int = 0
     model: str = ""
     processing_time: float = 0.0
     success: bool = False
@@ -67,10 +61,18 @@ class ExtractionEngine:
         client=None,
         async_client=None,
         max_image_side: int = MAX_IMAGE_SIDE,
+        helper_fields: list[str] | None = None,
+        template_fields: list[str] | None = None,
     ) -> None:
         self._client = client
         self._async_client = async_client
         self.max_image_side = max_image_side
+        self.helper_fields = list(
+            helper_fields if helper_fields is not None else config.MULTI_DOC_FIELDS
+        )
+        self.template_fields = list(
+            template_fields if template_fields is not None else config.TEMPLATE_FIELDS
+        )
 
     def extract(self, image: Image.Image, decision: RoutingDecision) -> ExtractionResult:
         result = ExtractionResult(model=decision.model)
@@ -97,7 +99,9 @@ class ExtractionEngine:
             )
             raw = response.choices[0].message.content or ""
             result.raw_response = raw
-            result.fields, result.confidence_scores = self._parse_json_object(raw)
+            self._capture_usage(response, result)
+            fields, confidences = self._parse_json_object(raw)
+            self._separate_helper_fields(fields, confidences, result)
             result.success = True
         except Exception as exc:
             result.error = f"{type(exc).__name__}: {exc}"
@@ -133,13 +137,35 @@ class ExtractionEngine:
             )
             raw = response.choices[0].message.content or ""
             result.raw_response = raw
-            result.fields, result.confidence_scores = self._parse_json_object(raw)
+            self._capture_usage(response, result)
+            fields, confidences = self._parse_json_object(raw)
+            self._separate_helper_fields(fields, confidences, result)
             result.success = True
         except Exception as exc:
             result.error = f"{type(exc).__name__}: {exc}"
             logger.error("Extraction failed (%s): %s", decision.model, exc)
         result.processing_time = round(time.perf_counter() - started, 2)
         return result
+
+    @staticmethod
+    def _capture_usage(response, result: ExtractionResult) -> None:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+        result.input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        result.output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+
+    def _separate_helper_fields(
+        self, fields: dict, confidences: dict[str, int], result: ExtractionResult
+    ) -> None:
+        for name in self.helper_fields:
+            if name in fields:
+                result.helper_values[name] = fields[name]
+                if name not in self.template_fields:
+                    fields.pop(name)
+                    confidences.pop(name, None)
+        result.fields = fields
+        result.confidence_scores = confidences
 
     def _get_client(self):
         if self._client is None:
