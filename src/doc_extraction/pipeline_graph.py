@@ -26,6 +26,7 @@ import json
 import logging
 import operator
 import queue
+import shutil
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -276,6 +277,11 @@ class RunEventBus:
             for subscriber in entry["queues"]:
                 subscriber.put(None)
 
+    def is_active(self, run_id: str) -> bool:
+        with self._lock:
+            entry = self._runs.get(run_id)
+            return bool(entry) and not entry["closed"]
+
 
 RUN_EVENTS = RunEventBus()
 
@@ -315,6 +321,25 @@ def list_runs() -> list[dict]:
             records.append(record)
     records.sort(key=lambda record: record.get("started_ts") or 0.0, reverse=True)
     return records
+
+
+def clear_run_registry() -> int:
+    if not config.RUNS_DIR.is_dir():
+        return 0
+    directories = [entry for entry in config.RUNS_DIR.iterdir() if entry.is_dir()]
+    for directory in directories:
+        record = read_run(directory.name)
+        if (
+            record
+            and record.get("status") == "running"
+            and RUN_EVENTS.is_active(directory.name)
+        ):
+            raise RuntimeError(f"run '{directory.name}' is still running")
+    for directory in directories:
+        shutil.rmtree(directory, ignore_errors=True)
+    if config.CHECKPOINT_DB.is_file():
+        config.CHECKPOINT_DB.unlink()
+    return len(directories)
 
 
 def _new_run_id(pdf_path: Path) -> str:

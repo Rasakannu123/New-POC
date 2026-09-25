@@ -2,6 +2,8 @@
 @import "@fontsource-variable/outfit";
 @import "@fontsource-variable/jetbrains-mono";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
@@ -14,6 +16,6 @@
     @apply antialiased;
   }
   body {
-    @apply bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100;
+    @apply bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100;
   }
 }

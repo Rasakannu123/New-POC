@@ -93,6 +93,15 @@ export async function getRunCheckpoints(
   return requestJson(`/api/runs/${encodeURIComponent(runId)}/checkpoints`);
 }
 
+export async function clearRuns(): Promise<{ removed: number }> {
+  const response = await fetch("/api/runs", { method: "DELETE" });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as { removed: number };
+}
+
 export function runStreamUrl(runId: string): string {
   return `/api/runs/${encodeURIComponent(runId)}/stream`;
 }

@@ -1,0 +1,93 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "DocExtract LangGraph Node Workflow",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/langgraph-workflow.html"
+  },
+  "lanes": [
+    { "id": "session", "label": "Session" },
+    { "id": "docs", "label": "Documents & gating" },
+    { "id": "models", "label": "Models & outputs" }
+  ],
+  "phases": [
+    { "id": "intake", "label": "Start & intake", "fromCol": 0, "toCol": 0 },
+    { "id": "render", "label": "Render & enhance", "fromCol": 1, "toCol": 1 },
+    { "id": "quality", "label": "Score & gate", "fromCol": 2, "toCol": 2 },
+    { "id": "decide", "label": "Quarantine & route", "fromCol": 3, "toCol": 3 },
+    { "id": "produce", "label": "Extract & group", "fromCol": 4, "toCol": 4 },
+    { "id": "close", "label": "Emit & close", "fromCol": 5, "toCol": 5 }
+  ],
+  "mainPath": [
+    "start",
+    "ingest",
+    "convert",
+    "enhance",
+    "assess",
+    "gate",
+    "quarantine",
+    "route",
+    "extract",
+    "group",
+    "emit",
+    "finalize",
+    "end"
+  ],
+  "nodes": [
+    { "id": "start", "lane": "session", "col": 0, "type": "external", "label": "__start__", "sublabel": "run begins", "width": 144 },
+    { "id": "ingest", "lane": "docs", "col": 0, "type": "backend", "label": "ingest", "sublabel": "validate PDF + workspace", "width": 144 },
+    { "id": "convert", "lane": "docs", "col": 1, "type": "backend", "label": "convert", "sublabel": "PDF to page images", "width": 144 },
+    { "id": "enhance", "lane": "models", "col": 1, "type": "backend", "label": "enhance", "sublabel": "deblur, denoise, deskew", "width": 144 },
+    { "id": "assess", "lane": "models", "col": 2, "type": "backend", "label": "assess", "sublabel": "OCR score + tier", "width": 144 },
+    { "id": "gate", "lane": "docs", "col": 2, "type": "security", "label": "gate", "sublabel": "no_need_page match", "width": 144 },
+    { "id": "quarantine", "lane": "docs", "col": 3, "type": "database", "label": "quarantine", "sublabel": "skip / manual review", "width": 144 },
+    { "id": "route", "lane": "models", "col": 3, "type": "backend", "label": "route", "sublabel": "tier to model", "width": 144 },
+    { "id": "extract", "lane": "models", "col": 4, "type": "cloud", "label": "extract", "sublabel": "vision model to fields", "width": 144 },
+    { "id": "group", "lane": "docs", "col": 4, "type": "backend", "label": "group", "sublabel": "pages to documents", "width": 144 },
+    { "id": "emit", "lane": "models", "col": 5, "type": "database", "label": "emit", "sublabel": "PDFs + JSON records", "width": 144 },
+    { "id": "finalize", "lane": "docs", "col": 5, "type": "backend", "label": "finalize", "sublabel": "totals + status", "width": 144 },
+    { "id": "end", "lane": "session", "col": 5, "type": "external", "label": "END", "sublabel": "run closed", "width": 144 }
+  ],
+  "edges": [
+    { "id": "start-ingest", "from": "start", "to": "ingest" },
+    { "id": "ingest-convert", "from": "ingest", "to": "convert", "label": "valid PDF" },
+    { "id": "convert-enhance", "from": "convert", "to": "enhance", "label": "page images" },
+    { "id": "enhance-assess", "from": "enhance", "to": "assess", "label": "enhanced" },
+    { "id": "assess-gate", "from": "assess", "to": "gate", "label": "score + tier" },
+    { "id": "gate-quarantine", "from": "gate", "to": "quarantine", "label": "verdicts" },
+    { "id": "quarantine-route", "from": "quarantine", "to": "route", "label": "needed pages" },
+    { "id": "route-extract", "from": "route", "to": "extract", "label": "routed model" },
+    { "id": "extract-group", "from": "extract", "to": "group", "label": "fields" },
+    { "id": "group-emit", "from": "group", "to": "emit", "label": "documents" },
+    { "id": "emit-finalize", "from": "emit", "to": "finalize", "label": "records" },
+    { "id": "finalize-end", "from": "finalize", "to": "end", "label": "totals" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Checkpointed supersteps",
+      "items": [
+        "Every node writes one LangGraph checkpoint to data/checkpoints.sqlite",
+        "Each node reports start, input, output and end through its trace envelope"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Short-circuit paths",
+      "items": [
+        "Invalid PDF or conversion failure jumps straight to finalize",
+        "No needed pages after quarantine also ends the run early"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Run identity",
+      "items": [
+        "One PDF is one run with thread_id = run_id",
+        "Run history and live node events are served under /api/runs"
+      ]
+    }
+  ]
+}

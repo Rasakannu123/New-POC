@@ -6,10 +6,11 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import RunTimeline, { StatusBadge } from "../components/RunTimeline";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { useRunStream } from "../lib/useRunStream";
 import { formatUsd } from "../lib/api";
 import type { CheckpointStep, RunRecord } from "../lib/runs";
-import { getRun, getRunCheckpoints, listRuns } from "../lib/runs";
+import { clearRuns, getRun, getRunCheckpoints, listRuns } from "../lib/runs";
 
 function formatTime(value: string | null): string {
   if (!value) return "-";
@@ -88,6 +89,8 @@ export default function PipelinePage() {
   const [tab, setTab] = useState<"nodes" | "checkpoints">("nodes");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearBusy, setClearBusy] = useState(false);
 
   const loadRuns = useCallback(() => {
     listRuns()
@@ -168,13 +171,27 @@ export default function PipelinePage() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
               Runs
             </h2>
-            <button
-              onClick={loadRuns}
-              aria-label="Refresh runs"
-              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
-            >
-              <ArrowsClockwise size={14} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={loadRuns}
+                aria-label="Refresh runs"
+                className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+              >
+                <ArrowsClockwise size={14} />
+              </button>
+              {runs.length > 0 && (
+                <button
+                  onClick={() => setClearOpen(true)}
+                  disabled={
+                    clearBusy ||
+                    runs.some((run) => run.status === "running")
+                  }
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
           {loading ? (
             <ul className="space-y-2 p-3">
@@ -313,6 +330,32 @@ export default function PipelinePage() {
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        open={clearOpen}
+        title="Clear pipeline runs"
+        message={`All ${runs.length} run(s) and their checkpoint history will be permanently deleted. This cannot be undone.`}
+        confirmLabel="Clear"
+        busy={clearBusy}
+        onCancel={() => {
+          if (!clearBusy) setClearOpen(false);
+        }}
+        onConfirm={async () => {
+          setClearBusy(true);
+          try {
+            await clearRuns();
+            setClearOpen(false);
+            setSelectedId(null);
+            setRecord(null);
+            setCheckpoints(null);
+            loadRuns();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          } finally {
+            setClearBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

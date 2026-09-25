@@ -25,6 +25,7 @@ from src.doc_extraction.cost import aggregate_records
 from src.doc_extraction.pipeline import run as run_pipeline
 from src.doc_extraction.pipeline_graph import (
     RUN_EVENTS,
+    clear_run_registry,
     list_runs,
     load_checkpoint_history,
     read_run,
@@ -237,6 +238,15 @@ def get_record(bucket: str, name: str) -> dict:
 @app.get("/api/runs")
 def get_runs() -> dict:
     return {"runs": list_runs()}
+
+
+@app.delete("/api/runs")
+def clear_runs() -> dict:
+    try:
+        removed = clear_run_registry()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    return {"removed": removed}
 
 
 @app.get("/api/runs/{run_id}")

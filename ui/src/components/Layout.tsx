@@ -9,9 +9,12 @@ import {
   SlidersHorizontal,
   Sparkle,
   Coins,
+  Sun,
+  Moon,
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { checkHealth } from "../lib/api";
+import { useTheme } from "../lib/useTheme";
 
 const NAV_ITEMS: { to: string; label: string; icon: JSX.Element }[] = [
   { to: "/", label: "Documents", icon: <UploadSimple size={18} weight="duotone" /> },
@@ -25,6 +28,7 @@ const NAV_ITEMS: { to: string; label: string; icon: JSX.Element }[] = [
 
 export default function Layout() {
   const [online, setOnline] = useState<boolean | null>(null);
+  const [theme, toggleTheme] = useTheme();
 
   useEffect(() => {
     checkHealth().then(setOnline);
@@ -41,6 +45,19 @@ export default function Layout() {
             <p className="text-sm font-semibold tracking-tight">DocExtract</p>
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400">POC console</p>
           </div>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            className="ml-auto rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          >
+            {theme === "dark" ? (
+              <Sun size={18} weight="duotone" />
+            ) : (
+              <Moon size={18} weight="duotone" />
+            )}
+          </button>
         </div>
 
         <nav className="flex-1 px-3">

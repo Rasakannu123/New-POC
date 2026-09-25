@@ -94,3 +94,43 @@ def test_run_stream_replays_trace_for_finished_run(monkeypatch, tmp_path):
 def test_run_stream_unknown_run_404(monkeypatch, tmp_path):
     client = _client(monkeypatch, tmp_path)
     assert client.get("/api/runs/nope/stream").status_code == 404
+
+
+def test_clear_runs_removes_runs_and_checkpoints(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "CHECKPOINT_DB", tmp_path / "cp.sqlite")
+    client = _client(monkeypatch, tmp_path)
+    _write_fake_run("a")
+    _write_fake_run("b")
+    (tmp_path / "cp.sqlite").write_bytes(b"sqlite")
+
+    response = client.delete("/api/runs")
+
+    assert response.status_code == 200
+    assert response.json() == {"removed": 2}
+    assert pipeline_graph.list_runs() == []
+    assert not (tmp_path / "cp.sqlite").exists()
+
+
+def test_clear_runs_refuses_while_a_run_is_live(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "CHECKPOINT_DB", tmp_path / "cp.sqlite")
+    client = _client(monkeypatch, tmp_path)
+    _write_fake_run("live", status="running")
+    pipeline_graph.RUN_EVENTS.publish("live", {"type": "run_start", "run_id": "live"})
+    try:
+        response = client.delete("/api/runs")
+    finally:
+        pipeline_graph.RUN_EVENTS.close("live")
+
+    assert response.status_code == 409
+    assert pipeline_graph.read_run("live") is not None
+
+
+def test_clear_runs_removes_stale_running_records(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "CHECKPOINT_DB", tmp_path / "cp.sqlite")
+    client = _client(monkeypatch, tmp_path)
+    _write_fake_run("stale", status="running")
+
+    response = client.delete("/api/runs")
+
+    assert response.status_code == 200
+    assert response.json() == {"removed": 1}
