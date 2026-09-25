@@ -17,8 +17,8 @@ dependencies = [
     "python-multipart>=0.0.9",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+packages = ["src"]
 
 [build-system]
 requires = ["setuptools>=68"]

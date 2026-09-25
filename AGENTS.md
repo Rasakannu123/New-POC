@@ -3,12 +3,12 @@
 ## Project
 
 Document extraction demo - PDF to structured JSON via a LangGraph pipeline.
-Entry point: `main.py` -> `src/doc_extraction/pipeline_graph.py`.
+Entry point: `main.py` -> `src/pipeline_graph.py`.
 
 ## Layout
 
-- `src/doc_extraction/config.py` - loads all settings/secrets from `.env`.
-- `src/doc_extraction/layers/` - one module per pipeline feature.
+- `src/config.py` - loads all settings/secrets from `.env`.
+- `src/` - one flat module per pipeline feature (no subfolders).
 - `app.py` + `ui.html` - one-page web UI (upload, process, data view).
 - `data/input/` - input PDFs; `data/output/` - enhanced images + result JSON.
 
@@ -17,7 +17,6 @@ Entry point: `main.py` -> `src/doc_extraction/pipeline_graph.py`.
 - Install: `pip install -r requirements.txt`
 - Run: `python main.py` (all PDFs in `data/input`) or `python main.py <file.pdf>`
 - Web UI: `python app.py` (http://127.0.0.1:8000)
-- Test: `pytest`
 - Lint: `ruff check .` (if installed)
 
 ## Conventions

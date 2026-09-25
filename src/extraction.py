@@ -25,8 +25,8 @@ from dataclasses import dataclass, field
 
 from PIL import Image
 
-from src.doc_extraction import config
-from src.doc_extraction.layers.router import ModelRouter, RoutingDecision
+from src import config
+from src.router import ModelRouter, RoutingDecision
 
 logger = logging.getLogger(__name__)
 

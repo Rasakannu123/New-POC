@@ -19,8 +19,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from src.doc_extraction import config
-from src.doc_extraction.layers.quality import QualityAssessment
+from src import config
+from src.quality import QualityAssessment
 
 logger = logging.getLogger(__name__)
 

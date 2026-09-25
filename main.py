@@ -16,7 +16,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from src.doc_extraction.pipeline_graph import run
+from src.pipeline_graph import run
 
 if __name__ == "__main__":
     files = [Path(arg) for arg in sys.argv[1:]] or None

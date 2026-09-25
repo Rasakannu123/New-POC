@@ -16,8 +16,8 @@ import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
-from src.doc_extraction import config
-from src.doc_extraction.pipeline_graph import run
+from src import config
+from src.pipeline_graph import run
 
 app = FastAPI(title="DocExtract Demo")
 

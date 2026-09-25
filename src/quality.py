@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from PIL import Image
 
-from src.doc_extraction import config
+from src import config
 
 logger = logging.getLogger(__name__)
 

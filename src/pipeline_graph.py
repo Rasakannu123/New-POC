@@ -20,15 +20,15 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from src.doc_extraction import config
-from src.doc_extraction.layers.conversion import ImageConversionLayer
-from src.doc_extraction.layers.extraction import ExtractionEngine
-from src.doc_extraction.layers.preprocessing import ImagePreprocessingEngine
-from src.doc_extraction.layers.quality import (
+from src import config
+from src.conversion import ImageConversionLayer
+from src.extraction import ExtractionEngine
+from src.preprocessing import ImagePreprocessingEngine
+from src.quality import (
     QualityAssessment,
     QualityAssessmentEngine,
 )
-from src.doc_extraction.layers.router import ModelRouter, RoutingDecision
+from src.router import ModelRouter, RoutingDecision
 
 logger = logging.getLogger("pipeline")
 
