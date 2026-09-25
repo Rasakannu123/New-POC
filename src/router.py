@@ -45,10 +45,16 @@ class ModelRouter:
         tier_model_map: dict[str, str] | None = None,
         default_model: str = DEFAULT_MODEL,
     ) -> None:
+        """Takes the tier -> model table from .env, with a fallback model so an
+        unexpected tier still gets a working model instead of crashing."""
         self.tier_model_map = dict(tier_model_map or config.TIER_MODEL_MAP)
         self.default_model = default_model
 
     def route(self, assessment: QualityAssessment) -> RoutingDecision:
+        """Picks the cheapest model that can handle the page's quality tier -
+        clear pages must not waste money on the large model, and blurry pages
+        must not be ruined by the small one. The reason is kept so the run can
+        explain every routing decision."""
         model = self.tier_model_map.get(assessment.tier)
         if not model:
             reason = (
@@ -74,6 +80,8 @@ class ModelRouter:
 
     @staticmethod
     def create_client():
+        """Builds the OpenAI-compatible gateway client used for extraction;
+        it lives here so the gateway settings are configured in one place."""
         from openai import OpenAI
 
         return OpenAI(api_key=config.API_KEY, base_url=config.BASE_URL)

@@ -51,6 +51,9 @@ TEMPLATE_PATH = Path(
 
 
 def _load_template_fields(path: Path) -> list[str]:
+    """Reads the field names from the template so extraction can be locked to
+    exactly those fields; returns [] when the file is missing or broken so
+    extraction falls back to free-form mode instead of crashing."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):

@@ -50,10 +50,16 @@ class ImageConversionLayer:
     """Converts each page of a PDF into an in-memory image."""
 
     def __init__(self, dpi: int = 300, poppler_path: str | None = None) -> None:
+        """Keeps the render DPI and the optional Poppler location, so callers
+        can override them without touching environment variables."""
         self.dpi = dpi
         self.poppler_path = poppler_path or os.getenv("POPPLER_PATH")
 
     def convert_pages(self, pdf_path: Path | str) -> ConversionResult:
+        """Renders every page of the PDF to an image - the first feature of the
+        pipeline, because every later step works on page images. Failures are
+        returned as result.error instead of raising, so one broken PDF can
+        never crash the rest of the run."""
         pdf_path = Path(pdf_path)
         result = ConversionResult(source_pdf=pdf_path)
 

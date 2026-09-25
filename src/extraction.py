@@ -53,7 +53,10 @@ _GROUNDING_RULES = (
 
 
 def build_extraction_prompt(template_fields: list[str] | None = None) -> str:
-    """Build the extraction prompt, optionally locked to template fields."""
+    """Build the extraction prompt, optionally locked to template fields.
+
+    The grounding rules exist because vision models happily invent plausible
+    values - the prompt forces them to transcribe only what is legible."""
     if template_fields:
         field_list = ", ".join(f'"{name}"' for name in template_fields)
         scope = (
@@ -117,6 +120,8 @@ class ExtractionEngine:
         max_image_side: int = MAX_IMAGE_SIDE,
         template_fields: list[str] | None = None,
     ) -> None:
+        """Accepts an already-connected client so many pages can share one
+        connection, plus the field list to lock extraction to."""
         self._client = client
         self.max_image_side = max_image_side
         self.template_fields = list(
@@ -124,6 +129,10 @@ class ExtractionEngine:
         )
 
     def extract(self, image: Image.Image, decision: RoutingDecision) -> ExtractionResult:
+        """Sends one page to the routed model and turns the reply into fields
+        with confidence scores - the actual data-extraction feature. Failures
+        land in result.error instead of raising, so one bad page never stops
+        the pipeline."""
         result = ExtractionResult(model=decision.model)
         started = time.perf_counter()
         try:
@@ -158,11 +167,15 @@ class ExtractionEngine:
         return result
 
     def _get_client(self):
+        """Creates the gateway client lazily so single-page callers do not have
+        to build one themselves."""
         if self._client is None:
             self._client = ModelRouter.create_client()
         return self._client
 
     def _to_base64_png(self, image: Image.Image) -> str:
+        """Downscales huge pages before sending, to keep request size and token
+        cost bounded without losing readable detail."""
         img = image.convert("RGB")
         if max(img.size) > self.max_image_side:
             scale = self.max_image_side / max(img.size)
@@ -175,6 +188,9 @@ class ExtractionEngine:
 
     @staticmethod
     def _parse_json_object(raw: str) -> tuple[dict, dict[str, int]]:
+        """Reads the model reply defensively - strips code fences and picks the
+        first JSON object - because models often wrap JSON in extra text, and a
+        parse failure should degrade to empty fields, not an exception."""
         text = raw.strip()
         if text.startswith("```"):
             text = text.strip("`")

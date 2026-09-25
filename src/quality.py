@@ -59,6 +59,8 @@ class QualityAssessmentEngine:
         blurry_threshold: float = 50.0,
         ocr_config: str = "--psm 3",
     ) -> None:
+        """Loads Tesseract once and caps parallel OCR calls, so processing
+        several pages never spawns an unbounded number of subprocesses."""
         self.clear_threshold = float(clear_threshold)
         self.blurry_threshold = float(blurry_threshold)
         self.ocr_config = ocr_config
@@ -68,6 +70,9 @@ class QualityAssessmentEngine:
         self._init_ocr()
 
     def assess(self, image: Image.Image) -> QualityAssessment:
+        """Produces the 0-100 score and quality tier - the decision input for
+        the model router, so pages that need an expensive model can be told
+        apart from pages that do not."""
         gray = np.array(image.convert("L"))
 
         ocr_result = self._ocr_confidence_score(gray)
@@ -100,6 +105,10 @@ class QualityAssessmentEngine:
         )
 
     def _ocr_confidence_score(self, gray: np.ndarray) -> dict[str, float]:
+        """Measures how confidently Tesseract reads the page. Junk words below
+        the confidence floor (stamps, borders, handwriting) are excluded so they
+        cannot inflate the score, and the result is weighted by readable text
+        coverage so a nearly empty page never scores high."""
         if self._pytesseract is None:
             return {
                 "score": 0.0,
@@ -188,6 +197,8 @@ class QualityAssessmentEngine:
             }
 
     def _init_ocr(self) -> None:
+        """Turns OCR on when Tesseract is installed and degrades gracefully to
+        score 0 when it is not, so the pipeline still runs without OCR."""
         try:
             import pytesseract
         except ImportError:

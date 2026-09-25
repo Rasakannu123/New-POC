@@ -52,6 +52,8 @@ class ImagePreprocessingEngine:
         deblur: bool = True,
         binarize: bool = False,
     ) -> None:
+        """Every step is a switch so quality can be tuned per document type -
+        for example binarize stays off because it can destroy grey photos."""
         self.denoise = denoise
         self.deskew = deskew
         self.enhance_contrast = enhance_contrast
@@ -59,12 +61,16 @@ class ImagePreprocessingEngine:
         self.binarize = binarize
 
     def enhance(self, image: Image.Image) -> Image.Image:
+        """The image-only entry point used by the pipeline when the diagnostics
+        report is not needed."""
         enhanced, _report = self.enhance_with_report(image)
         return enhanced
 
     def enhance_with_report(
         self, image: Image.Image
     ) -> tuple[Image.Image, PreprocessingReport]:
+        """Runs the full cleanup chain and reports which steps were applied, so
+        quality problems can be traced back to a specific step later."""
         report = PreprocessingReport()
 
         rgb = np.array(image.convert("RGB"))
@@ -112,6 +118,9 @@ class ImagePreprocessingEngine:
         return Image.fromarray(gray), report
 
     def _estimate_skew_angle(self, gray: np.ndarray) -> float:
+        """Finds the dominant text angle from detected lines (Hough transform),
+        with a min-area-rectangle fallback, so deskewing works on both lined
+        text pages and pages without clear lines."""
         ink = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
         edges = cv2.Canny(ink, 50, 150, apertureSize=3)
@@ -147,6 +156,8 @@ class ImagePreprocessingEngine:
 
     @staticmethod
     def _rotate(gray: np.ndarray, angle: float) -> np.ndarray:
+        """Rotates the page by the measured angle to straighten tilted text -
+        straight text reads far more accurately in OCR and the vision model."""
         height, width = gray.shape[:2]
         matrix = cv2.getRotationMatrix2D((width // 2, height // 2), angle, 1.0)
         return cv2.warpAffine(
@@ -164,6 +175,8 @@ class ImagePreprocessingEngine:
         psf_sigma: float = 2.0,
         noise_ratio: float = 0.02,
     ) -> np.ndarray:
+        """Sharpens motion-blurred scans with frequency-domain deconvolution;
+        only invoked on detected-blurry pages so sharp pages are never damaged."""
         height, width = gray.shape
         image = gray.astype(np.float32)
 
@@ -185,5 +198,7 @@ class ImagePreprocessingEngine:
 
     @staticmethod
     def _unsharp_mask(gray: np.ndarray, amount: float = 1.0, sigma: float = 2.0) -> np.ndarray:
+        """Boosts edge contrast after deblurring so characters regain crisp
+        borders for OCR."""
         blurred = cv2.GaussianBlur(gray, (0, 0), sigmaX=sigma)
         return cv2.addWeighted(gray, 1.0 + amount, blurred, -amount, 0)

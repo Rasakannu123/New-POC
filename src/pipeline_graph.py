@@ -43,6 +43,9 @@ FEATURES = {
 
 
 class PipelineState(TypedDict, total=False):
+    """The data handed from node to node - everything a later node needs, and
+    nothing more, so the state stays small and easy to follow."""
+
     pdf_path: str
     images: list
     enhanced: list
@@ -54,10 +57,14 @@ class PipelineState(TypedDict, total=False):
 
 
 def _show(node: str) -> None:
+    """Prints the feature name so the terminal always shows what the pipeline
+    is working on right now - the demo's only progress display."""
     print(f"  [{node}] {FEATURES[node]}")
 
 
 def convert_node(state: PipelineState) -> dict:
+    """Feature 1 - turns the PDF into page images, because every later node
+    works per page image. A broken PDF sets the error that ends the run."""
     _show("convert")
     result = ImageConversionLayer(dpi=config.DPI).convert_pages(state["pdf_path"])
     if not result.success:
@@ -68,12 +75,16 @@ def convert_node(state: PipelineState) -> dict:
 
 
 def enhance_node(state: PipelineState) -> dict:
+    """Feature 2 - cleans up each page image so OCR and the vision model read
+    it as clearly as possible."""
     _show("enhance")
     engine = ImagePreprocessingEngine()
     return {"enhanced": [engine.enhance(image) for image in state["images"]]}
 
 
 def assess_node(state: PipelineState) -> dict:
+    """Feature 3 - scores every page 0-100 and assigns a quality tier; the
+    scores are printed because they explain every later routing choice."""
     _show("assess")
     engine = QualityAssessmentEngine()
     assessments = []
@@ -87,6 +98,8 @@ def assess_node(state: PipelineState) -> dict:
 
 
 def route_node(state: PipelineState) -> dict:
+    """Feature 4 - maps each page's tier to an extraction model, so clear pages
+    use the cheap model and only hard pages pay for the strong one."""
     _show("route")
     router = ModelRouter()
     routing = []
@@ -108,6 +121,8 @@ def route_node(state: PipelineState) -> dict:
 
 
 def extract_node(state: PipelineState) -> dict:
+    """Feature 5 - the model call that turns each page image into fields and
+    confidence scores; one entry per page so results stay page-aligned."""
     _show("extract")
     engine = ExtractionEngine()
     routing = {item["page"]: item for item in state["routing"]}
@@ -136,6 +151,9 @@ def extract_node(state: PipelineState) -> dict:
 
 
 def output_node(state: PipelineState) -> dict:
+    """Feature 6 - writes the enhanced page images and result.json; this file
+    is the final data the web UI displays, so score, tier, model and fields
+    are merged per page here."""
     _show("output")
     pdf = Path(state["pdf_path"])
     directory = config.OUTPUT_DIR / pdf.stem
@@ -170,10 +188,14 @@ def output_node(state: PipelineState) -> dict:
 
 
 def _after_convert(state: PipelineState) -> str:
+    """Routes straight to the end when conversion failed - the other nodes
+    cannot do anything without page images."""
     return "end" if state.get("error") else "enhance"
 
 
 def build_graph() -> StateGraph:
+    """Wires the six feature nodes into one LangGraph pipeline - the graph is
+    what makes the run order and the per-feature progress explicit."""
     builder = StateGraph(PipelineState)
     builder.add_node("convert", convert_node)
     builder.add_node("enhance", enhance_node)
@@ -194,6 +216,8 @@ def build_graph() -> StateGraph:
 
 
 def run(pdf_files: list[Path] | None = None) -> int:
+    """Runs the graph once per PDF (or for the given files) and returns a shell
+    exit code, so both main.py and the web UI share the exact same pipeline."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)-7s | %(message)s",
