@@ -1,13 +1,17 @@
 {
   "extracted_fields": {
-    "invoice_number": ""
+    "invoice_number": "",
+    "dete": "",
+    "buyer": "",
+    "seller": "",
+    "trn": ""
   },
   "no_need_page": {
     "delivery-note-no": "",
-    "supplier-address":"",
-    "delivery-address":"",
-    "delivery-information":"",
-    "item-code":""
+    "supplier-address": "",
+    "delivery-address": "",
+    "delivery-information": "",
+    "item-code": ""
   },
   "multiple-docs": {
     "same-words-every-pages": {
