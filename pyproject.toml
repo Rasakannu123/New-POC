@@ -12,6 +12,9 @@ dependencies = [
     "pytesseract>=0.3.10",
     "openai>=1.0.0",
     "langgraph>=0.2.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+    "python-multipart>=0.0.9",
 ]
 
 [tool.setuptools.packages.find]

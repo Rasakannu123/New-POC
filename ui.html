@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocExtract Demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #fafafa; color: #222; }
+  header { background: #059669; color: #fff; padding: 14px 24px; }
+  header h1 { font-size: 18px; margin: 0; }
+  header p { margin: 4px 0 0; font-size: 13px; opacity: .9; }
+  main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+  section { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: #666; margin: 0 0 12px; }
+  button { background: #059669; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font-size: 14px; cursor: pointer; }
+  button.secondary { background: #fff; color: #059669; border: 1px solid #059669; }
+  button:disabled { opacity: .5; cursor: default; }
+  .muted { color: #777; font-size: 13px; }
+  .error { color: #b91c1c; }
+  .chips button { margin: 0 6px 6px 0; }
+  .page { display: flex; gap: 16px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .page img { width: 230px; border: 1px solid #eee; border-radius: 4px; }
+  .page h3 { margin: 0 0 8px; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #e5e5e5; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f5f5f5; }
+</style>
+</head>
+<body>
+<header>
+  <h1>DocExtract Demo</h1>
+  <p>Upload a PDF, run the pipeline, view the extracted data</p>
+</header>
+<main>
+  <section>
+    <h2>1 &middot; Upload</h2>
+    <input type="file" id="fileInput" accept=".pdf" multiple>
+    <button data-action="upload">Upload</button>
+    <p class="muted" id="uploadStatus">PDFs are saved to data/input.</p>
+    <div class="chips" id="fileList"></div>
+  </section>
+
+  <section>
+    <h2>2 &middot; Process</h2>
+    <button data-action="process" id="processButton">Process all</button>
+    <p class="muted" id="processStatus">This terminal window shows each feature while the pipeline runs.</p>
+  </section>
+
+  <section>
+    <h2>3 &middot; Data view</h2>
+    <div class="chips" id="resultList"></div>
+    <div id="detail"></div>
+  </section>
+</main>
+
+<script>
+const byId = (id) => document.getElementById(id);
+
+async function api(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    let message = response.statusText;
+    try { message = (await response.json()).detail || message; } catch (e) {}
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"]/g, (ch) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
+  }[ch]));
+}
+
+async function loadFiles() {
+  const data = await api("/api/files");
+  byId("fileList").innerHTML = data.files.length
+    ? data.files.map((f) =>
+        `<button class="secondary" data-action="process-one" data-name="${escapeHtml(f.name)}">${escapeHtml(f.name)} - process</button>`
+      ).join("")
+    : '<p class="muted">No PDFs in data/input yet.</p>';
+}
+
+async function loadResults() {
+  const data = await api("/api/results");
+  byId("resultList").innerHTML = data.results.length
+    ? data.results.map((r) =>
+        `<button class="secondary" data-action="show-result" data-name="${escapeHtml(r.name)}">${escapeHtml(r.document)}</button>`
+      ).join("")
+    : '<p class="muted">No results yet.</p>';
+  return data.results;
+}
+
+async function upload() {
+  const input = byId("fileInput");
+  if (!input.files.length) return;
+  const form = new FormData();
+  for (const file of input.files) form.append("files", file);
+  byId("uploadStatus").textContent = "Uploading...";
+  try {
+    const data = await api("/api/upload", { method: "POST", body: form });
+    byId("uploadStatus").textContent = "Uploaded: " + data.saved.join(", ");
+    input.value = "";
+    loadFiles();
+  } catch (err) {
+    byId("uploadStatus").innerHTML = '<span class="error"></span>';
+    byId("uploadStatus").querySelector(".error").textContent = err.message;
+  }
+}
+
+async function processFiles(name) {
+  const button = byId("processButton");
+  button.disabled = true;
+  byId("processStatus").textContent =
+    (name ? "Processing " + name + "..." : "Processing all PDFs...") +
+    " watch the terminal for the current feature.";
+  try {
+    const url = name
+      ? "/api/process?file=" + encodeURIComponent(name)
+      : "/api/process";
+    const data = await api(url, { method: "POST" });
+    byId("processStatus").textContent =
+      data.exit_code === 0 ? "Done." : "Finished with failures - see the terminal.";
+    loadResults().then((results) => {
+      const target = name ? results.find((r) => r.name === name.replace(/\.pdf$/i, "")) : null;
+      if (target) showResult(target.name);
+    });
+  } catch (err) {
+    byId("processStatus").innerHTML = '<span class="error"></span>';
+    byId("processStatus").querySelector(".error").textContent = err.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function showResult(name) {
+  const record = await api("/api/results/" + encodeURIComponent(name));
+  byId("detail").innerHTML = record.pages.map((page) => {
+    const rows = Object.keys(page.extracted_fields).map((key) => {
+      const value = page.extracted_fields[key];
+      const confidence = page.field_confidence_scores[key] ?? 0;
+      return `<tr><td>${escapeHtml(key)}</td><td>${value == null ? "<i>null</i>" : escapeHtml(value)}</td><td>${confidence}</td></tr>`;
+    }).join("");
+    return `
+      <div class="page">
+        <img src="/api/output/${encodeURIComponent(record.name)}/${encodeURIComponent(page.image)}" alt="page ${page.page}">
+        <div style="flex:1">
+          <h3>Page ${page.page} - score ${page.quality_score} (${escapeHtml(page.quality_tier)}) - ${escapeHtml(page.model)}</h3>
+          <table>
+            <tr><th>Field</th><th>Value</th><th>Confidence</th></tr>
+            ${rows}
+          </table>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-action]");
+  if (!target) return;
+  const action = target.dataset.action;
+  if (action === "upload") upload();
+  if (action === "process") processFiles(null);
+  if (action === "process-one") processFiles(target.dataset.name);
+  if (action === "show-result") showResult(target.dataset.name);
+});
+
+loadFiles().catch(() => undefined);
+loadResults().catch(() => undefined);
+</script>
+</body>
+</html>

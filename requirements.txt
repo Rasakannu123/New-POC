@@ -15,3 +15,8 @@ openai>=1.0.0
 
 # LangGraph pipeline
 langgraph>=0.2.0
+
+# Simple upload + data view UI (app.py / ui.html)
+fastapi>=0.110.0
+uvicorn>=0.29.0
+python-multipart>=0.0.9

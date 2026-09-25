@@ -49,5 +49,15 @@ python main.py                    # every PDF in data/input
 python main.py path/to/file.pdf   # one specific PDF
 ```
 
+## Simple web UI (upload + data view)
+
+```
+python app.py                     # then open http://127.0.0.1:8000
+```
+
+One page with three steps: upload a PDF, process it, and view the extracted
+data (page image, quality score, model, fields). The terminal still shows
+each feature while the pipeline runs.
+
 All configuration (gateway URL, API key, model IDs, tier mapping, DPI,
 paths) lives in `.env`.

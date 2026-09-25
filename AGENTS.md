@@ -9,12 +9,14 @@ Entry point: `main.py` -> `src/doc_extraction/pipeline_graph.py`.
 
 - `src/doc_extraction/config.py` - loads all settings/secrets from `.env`.
 - `src/doc_extraction/layers/` - one module per pipeline feature.
+- `app.py` + `ui.html` - one-page web UI (upload, process, data view).
 - `data/input/` - input PDFs; `data/output/` - enhanced images + result JSON.
 
 ## Commands
 
 - Install: `pip install -r requirements.txt`
 - Run: `python main.py` (all PDFs in `data/input`) or `python main.py <file.pdf>`
+- Web UI: `python app.py` (http://127.0.0.1:8000)
 - Test: `pytest`
 - Lint: `ruff check .` (if installed)
 
