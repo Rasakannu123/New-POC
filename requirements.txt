@@ -1,28 +1,17 @@
 # Configuration
 python-dotenv>=1.0.0
 
-# Step 1 - Image Conversion Layer
+# PDF -> images
 pdf2image>=1.17.0
 Pillow>=10.0.0
 
-# Step 2 - Image Preprocessing Engine
+# Image enhancement + quality assessment
 opencv-python>=4.8.0
 numpy>=1.24.0
-
-# Step 3 - Quality Assessment Engine (OCR-confidence metric)
 pytesseract>=0.3.10
 
-# Step 4 - Model Router / Step 5 - Extraction (OpenAI-compatible gateway client)
+# Data extraction (OpenAI-compatible gateway)
 openai>=1.0.0
 
-# Multiple Documents Feature (split source PDF into per-document PDFs)
-pypdf>=4.0.0
-
-# Review UI API server (src/doc_extraction/server.py)
-fastapi>=0.110.0
-uvicorn>=0.29.0
-python-multipart>=0.0.9
-
-# LangGraph orchestration (src/doc_extraction/pipeline_graph.py)
+# LangGraph pipeline
 langgraph>=0.2.0
-langgraph-checkpoint-sqlite>=2.0.0

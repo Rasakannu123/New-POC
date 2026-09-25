@@ -1,53 +1,33 @@
-# Document Extraction POC
+# Document Extraction Demo
 
-Image quality assessment and model-selection pipeline for document
-extraction. Each PDF page is converted, enhanced, scored, routed to a
-vision model appropriate to its quality, and extracted into structured
-JSON. Console logging only - no UI.
+Converts PDF documents into structured JSON through a six-step LangGraph
+pipeline. Every step prints the feature it is working on to the terminal.
 
 ## Pipeline
 
 ```
 data/input/*.pdf
-   -> Convert      (PDF -> page images, 300 DPI)
-   -> Preprocess   (grayscale, adaptive deblur, denoise, deskew, CLAHE)
-   -> Assess       (0-100 score: 40% focus + 60% OCR confidence)
-   -> Route        (quality tier -> vision model)
-   -> Extract      (top fields/values + confidence)
-   -> data/output/ (<doc>_<page>_q<score>.png / .json)
+   -> Convert     (PDF -> page images)
+   -> Enhance     (grayscale, deblur, denoise, deskew, CLAHE)
+   -> Assess      (0-100 OCR-confidence score + tier)
+   -> Route       (quality tier -> vision model)
+   -> Extract     (fields + confidence via the vision model)
+   -> Output      (enhanced images + result.json)
 ```
 
-## Routing
+## Model routing
 
 | Tier | Score | Model |
 |---|---|---|
-| clear | > 80 | `mimo-v2.5` |
-| blurry | 50-80 | `minimax-m3` |
-| very_blurry | < 50 | `qwen3.8-max` |
+| clear | > 80 | `IMAGE_MODEL_SMALL` |
+| blurry | 50-80 | `IMAGE_MODEL_MEDIUM` |
+| very_blurry | < 50 | `IMAGE_MODEL_LARGE` |
 
-## Project structure
+## Output
 
 ```
-New-POC/
-  main.py                     entry point
-  requirements.txt
-  pyproject.toml
-  .env                        all secrets + settings (gitignored)
-  .env.example                template
-  data/
-    input/                    drop PDFs here
-    output/                   generated png + json
-  src/
-    doc_extraction/
-      config.py               loads .env
-      pipeline.py             orchestrator
-      layers/
-        conversion.py         PDF -> images
-        preprocessing.py      OpenCV enhancement
-        quality.py            score + tier
-        router.py             tier -> model
-        extraction.py         vision model -> fields
-  tests/
+data/output/<document>/page-01.png ...   enhanced page images
+data/output/<document>/result.json       per-page score, tier, model, fields
 ```
 
 ## Setup
@@ -59,13 +39,14 @@ pip install -r requirements.txt
 copy .env.example .env   # then fill in API_KEY and BASE_URL
 ```
 
-Requires Poppler (PDF rendering) and Tesseract (OCR confidence) on PATH,
+Requires Poppler (PDF rendering) and Tesseract (OCR) on PATH,
 or set `POPPLER_PATH` in `.env`.
 
 ## Run
 
 ```
-python main.py
+python main.py                    # every PDF in data/input
+python main.py path/to/file.pdf   # one specific PDF
 ```
 
 All configuration (gateway URL, API key, model IDs, tier mapping, DPI,

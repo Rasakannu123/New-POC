@@ -1,18 +1,23 @@
 """
-POC entry point.
+Demo entry point.
 
-Runs the full document pipeline end to end:
-    Input PDF -> convert -> enhance -> assess -> route -> extract -> Output
+Runs the LangGraph document-extraction pipeline end to end:
+    PDF -> images -> enhance -> assess -> route -> extract -> JSON
 
-All configuration (endpoints, keys, models, paths) is read from .env via
-the package config module.
+Every node prints the feature it is working on to the terminal.
+
+Usage:
+    python main.py                    # every PDF in data/input
+    python main.py path/to/file.pdf   # one specific PDF
 """
 
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
-from src.doc_extraction.pipeline import run
+from src.doc_extraction.pipeline_graph import run
 
 if __name__ == "__main__":
-    sys.exit(run())
+    files = [Path(arg) for arg in sys.argv[1:]] or None
+    sys.exit(run(files))
