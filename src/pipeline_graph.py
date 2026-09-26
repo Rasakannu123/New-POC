@@ -64,7 +64,8 @@ def _show(node: str) -> None:
 
 def convert_node(state: PipelineState) -> dict:
     """Feature 1 - turns the PDF into page images, because every later node
-    works per page image. A broken PDF sets the error that ends the run."""
+    works per page image. A broken PDF is recorded in state and reported at
+    the end of the run instead of crashing."""
     _show("convert")
     result = ImageConversionLayer(dpi=config.DPI).convert_pages(state["pdf_path"])
     if not result.success:
@@ -79,7 +80,7 @@ def enhance_node(state: PipelineState) -> dict:
     it as clearly as possible."""
     _show("enhance")
     engine = ImagePreprocessingEngine()
-    return {"enhanced": [engine.enhance(image) for image in state["images"]]}
+    return {"enhanced": [engine.enhance(image) for image in state.get("images", [])]}
 
 
 def assess_node(state: PipelineState) -> dict:
@@ -153,7 +154,9 @@ def extract_node(state: PipelineState) -> dict:
 def output_node(state: PipelineState) -> dict:
     """Feature 6 - writes the enhanced page images and result.json; this file
     is the final data the web UI displays, so score, tier, model and fields
-    are merged per page here."""
+    are merged per page here. Nothing is written when nothing was extracted."""
+    if not state.get("extractions"):
+        return {}
     _show("output")
     pdf = Path(state["pdf_path"])
     directory = config.OUTPUT_DIR / pdf.stem
@@ -187,12 +190,6 @@ def output_node(state: PipelineState) -> dict:
     return {"output_json": str(output_json)}
 
 
-def _after_convert(state: PipelineState) -> str:
-    """Routes straight to the end when conversion failed - the other nodes
-    cannot do anything without page images."""
-    return "end" if state.get("error") else "enhance"
-
-
 def build_graph() -> StateGraph:
     """Wires the six feature nodes into one LangGraph pipeline - the graph is
     what makes the run order and the per-feature progress explicit."""
@@ -204,9 +201,7 @@ def build_graph() -> StateGraph:
     builder.add_node("extract", extract_node)
     builder.add_node("output", output_node)
     builder.add_edge(START, "convert")
-    builder.add_conditional_edges(
-        "convert", _after_convert, {"enhance": "enhance", "end": END}
-    )
+    builder.add_edge("convert", "enhance")
     builder.add_edge("enhance", "assess")
     builder.add_edge("assess", "route")
     builder.add_edge("route", "extract")
