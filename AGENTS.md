@@ -8,6 +8,7 @@ Entry point: `main.py` -> `src/pipeline_graph.py`.
 ## Layout
 
 - `src/config.py` - loads all settings/secrets from `.env`.
+- `src/prompts.py` - all AI model prompts in one place.
 - `src/` - one flat module per pipeline feature (no subfolders).
 - `app.py` + `ui.html` - one-page web UI (upload, process, data view).
 - `data/input/` - input PDFs; `data/output/` - enhanced images + result JSON.

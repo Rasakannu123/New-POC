@@ -1,0 +1,85 @@
+"""
+All prompts live here
+---------------------
+Every instruction sent to an AI model is collected in this one file, so the
+wording can be reviewed and tuned without touching pipeline logic.
+
+Current prompts:
+    - build_extraction_prompt()  the data-extraction request (feature 5)
+
+Rules of thumb for editing prompts:
+    - keep the grounding rules strict: models invent plausible values
+      whenever the wording gives them room to guess.
+    - keep the output format fixed: only one JSON object, no markdown.
+"""
+
+from __future__ import annotations
+
+from src import config
+
+MAX_FIELDS = 10
+
+_GROUNDING_RULES = (
+    "STRICT GROUNDING RULES (highest priority): "
+    "1. Extract only text you can clearly see and read in the image. "
+    "2. Copy every value exactly and completely as printed - do NOT guess, "
+    "infer, auto-complete, translate, or correct spelling from prior "
+    "knowledge. "
+    "3. Never return partial or truncated values: no '...', no incomplete "
+    "words or cut-off numbers. If you can read only part of a value, "
+    "treat the field as unreadable. "
+    "4. If the page is very blurry or low quality, or you can only make "
+    "out fragments of text, do NOT try to reconstruct the document from "
+    "its layout, language, or document type. "
+    "5. Never invent dates, amounts, names, or reference numbers, and "
+    "never format or recompute values that are not printed as such. "
+    "6. Set confidence honestly: high (80-100) only when the text is "
+    "fully legible, low (0-30) when it is partially legible or blurry. "
+)
+
+
+def build_extraction_prompt(template_fields: list[str] | None = None) -> str:
+    """Build the extraction prompt, optionally locked to template fields.
+
+    The grounding rules exist because vision models happily invent plausible
+    values - the prompt forces them to transcribe only what is legible."""
+    if template_fields:
+        field_list = ", ".join(f'"{name}"' for name in template_fields)
+        scope = (
+            "Extract EXACTLY these fields and no others: "
+            f"{field_list}. "
+            "Return one entry for every listed field, in the same order. "
+            "If a field does not appear on the page, or its value cannot "
+            'be read completely, set its "value" to null and its '
+            '"confidence" to 0 - never omit the field and never guess '
+            "its value. "
+        )
+        fallback_rule = ""
+    else:
+        scope = (
+            "Extract ONLY the top most important fields and their values "
+            f"(at most {MAX_FIELDS} fields - e.g. document type, dates, "
+            "names, amounts, reference numbers, addresses). "
+        )
+        fallback_rule = (
+            "7. If a field is unreadable, unclear, or you are not certain "
+            "its value is really printed on the page, SKIP that field "
+            "entirely - never output empty values, placeholders like "
+            "'N/A' or 'unknown', or your best guess. "
+            "8. If no field can be read completely and with certainty, or "
+            "the page contains no meaningful fields, return exactly: {}. "
+        )
+
+    return (
+        "You are a document data-extraction engine. Examine this document "
+        "page image. "
+        + scope
+        + 'Return ONLY a valid JSON object with this exact format: '
+        '{"field_name": {"value": "extracted_value", "confidence": 85}}. '
+        + _GROUNDING_RULES
+        + fallback_rule
+        + "No markdown, no code fences, no explanations."
+    )
+
+
+EXTRACTION_PROMPT = build_extraction_prompt(config.TEMPLATE_FIELDS)
