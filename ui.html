@@ -34,8 +34,8 @@
 <main>
   <section>
     <h2>1 &middot; Upload</h2>
-    <input type="file" id="fileInput" accept=".pdf" multiple>
     <button data-action="upload">Upload</button>
+    <input type="file" id="fileInput" accept=".pdf" multiple hidden>
     <p class="muted" id="uploadStatus">PDFs are saved to data/input.</p>
     <div class="chips" id="fileList"></div>
   </section>
@@ -93,7 +93,10 @@ async function loadResults() {
 
 async function upload() {
   const input = byId("fileInput");
-  if (!input.files.length) return;
+  if (!input.files.length) {
+    input.click();
+    return;
+  }
   const form = new FormData();
   for (const file of input.files) form.append("files", file);
   byId("uploadStatus").textContent = "Uploading...";
@@ -164,6 +167,8 @@ document.addEventListener("click", (event) => {
   if (action === "process-one") processFiles(target.dataset.name);
   if (action === "show-result") showResult(target.dataset.name);
 });
+
+byId("fileInput").addEventListener("change", () => upload());
 
 loadFiles().catch(() => undefined);
 loadResults().catch(() => undefined);
