@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import shutil
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 from PIL import Image
@@ -47,7 +47,6 @@ class QualityAssessment:
 
     score: float
     tier: str
-    metrics: dict[str, float] = field(default_factory=dict)
 
 
 class QualityAssessmentEngine:
@@ -74,19 +73,7 @@ class QualityAssessmentEngine:
         the model router, so pages that need an expensive model can be told
         apart from pages that do not."""
         gray = np.array(image.convert("L"))
-
-        ocr_result = self._ocr_confidence_score(gray)
-
-        metric_scores: dict[str, float] = {
-            "ocr_confidence": ocr_result["score"],
-            "ocr_word_count": ocr_result["word_count"],
-            "ocr_char_count": ocr_result["char_count"],
-            "ocr_mean_confidence": ocr_result["mean_confidence"],
-            "ocr_readable_word_count": ocr_result["readable_word_count"],
-            "ocr_readable_char_count": ocr_result["readable_char_count"],
-        }
-
-        score = round(float(np.clip(ocr_result["score"], 0.0, 100.0)), 1)
+        score = round(self._ocr_confidence_score(gray), 1)
 
         if score > self.clear_threshold:
             tier = TIER_CLEAR
@@ -95,29 +82,15 @@ class QualityAssessmentEngine:
         else:
             tier = TIER_VERY_BLURRY
 
-        return QualityAssessment(
-            score=score,
-            tier=tier,
-            metrics={
-                name: round(float(value), 1)
-                for name, value in metric_scores.items()
-            },
-        )
+        return QualityAssessment(score=score, tier=tier)
 
-    def _ocr_confidence_score(self, gray: np.ndarray) -> dict[str, float]:
+    def _ocr_confidence_score(self, gray: np.ndarray) -> float:
         """Measures how confidently Tesseract reads the page. Junk words below
         the confidence floor (stamps, borders, handwriting) are excluded so they
         cannot inflate the score, and the result is weighted by readable text
         coverage so a nearly empty page never scores high."""
         if self._pytesseract is None:
-            return {
-                "score": 0.0,
-                "mean_confidence": 0.0,
-                "word_count": 0.0,
-                "char_count": 0.0,
-                "readable_word_count": 0.0,
-                "readable_char_count": 0.0,
-            }
+            return 0.0
 
         try:
             with self._ocr_semaphore:
@@ -155,46 +128,20 @@ class QualityAssessmentEngine:
                     readable_confidences.append(clipped)
                     readable_char_weights.append(char_count)
 
-            word_count = len(all_confidences)
-            total_chars = sum(all_char_weights)
-            readable_word_count = len(readable_confidences)
-            readable_chars = sum(readable_char_weights)
-
-            if readable_word_count == 0 or readable_chars == 0:
-                return {
-                    "score": 0.0,
-                    "mean_confidence": 0.0,
-                    "word_count": float(word_count),
-                    "char_count": float(total_chars),
-                    "readable_word_count": float(readable_word_count),
-                    "readable_char_count": float(readable_chars),
-                }
+            if not readable_confidences or not readable_char_weights:
+                return 0.0
 
             mean_confidence = float(
                 np.average(readable_confidences, weights=readable_char_weights)
             )
-            coverage = min(1.0, readable_chars / COVERAGE_TARGET_CHARS)
+            coverage = min(1.0, sum(readable_char_weights) / COVERAGE_TARGET_CHARS)
             score = mean_confidence * coverage
 
-            return {
-                "score": float(np.clip(score, 0.0, 100.0)),
-                "mean_confidence": float(np.clip(mean_confidence, 0.0, 100.0)),
-                "word_count": float(word_count),
-                "char_count": float(total_chars),
-                "readable_word_count": float(readable_word_count),
-                "readable_char_count": float(readable_chars),
-            }
+            return float(np.clip(score, 0.0, 100.0))
 
         except Exception as exc:
             logger.warning("OCR-confidence metric failed: %s", exc)
-            return {
-                "score": 0.0,
-                "mean_confidence": 0.0,
-                "word_count": 0.0,
-                "char_count": 0.0,
-                "readable_word_count": 0.0,
-                "readable_char_count": 0.0,
-            }
+            return 0.0
 
     def _init_ocr(self) -> None:
         """Turns OCR on when Tesseract is installed and degrades gracefully to

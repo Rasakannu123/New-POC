@@ -114,7 +114,6 @@ def route_node(state: PipelineState) -> dict:
                 "model": decision.model,
                 "tier": decision.tier,
                 "score": decision.score,
-                "reason": decision.reason,
             }
         )
         print(f"       page {item['page']}: {decision.model}")
@@ -134,7 +133,6 @@ def extract_node(state: PipelineState) -> dict:
             model=item["model"],
             tier=item["tier"],
             score=item["score"],
-            reason=item["reason"],
         )
         result = engine.extract(image, decision)
         extractions.append(

@@ -29,12 +29,11 @@ DEFAULT_MODEL = config.TIER_MODEL_MAP.get("very_blurry", "")
 
 @dataclass
 class RoutingDecision:
-    """The model selected for one page, with the reason why."""
+    """The model selected for one page."""
 
     model: str
     tier: str
     score: float
-    reason: str
 
 
 class ModelRouter:
@@ -53,29 +52,19 @@ class ModelRouter:
     def route(self, assessment: QualityAssessment) -> RoutingDecision:
         """Picks the cheapest model that can handle the page's quality tier -
         clear pages must not waste money on the large model, and blurry pages
-        must not be ruined by the small one. The reason is kept so the run can
-        explain every routing decision."""
+        must not be ruined by the small one."""
         model = self.tier_model_map.get(assessment.tier)
         if not model:
-            reason = (
-                f"tier '{assessment.tier}' has no model configured "
-                f"-> fallback to default model '{self.default_model}'"
-            )
             logger.warning(
                 "No model configured for tier '%s'; falling back to %s",
                 assessment.tier,
                 self.default_model,
             )
             model = self.default_model
-        else:
-            reason = (
-                f"tier '{assessment.tier}' (score {assessment.score}) -> {model}"
-            )
         return RoutingDecision(
             model=model,
             tier=assessment.tier,
             score=assessment.score,
-            reason=reason,
         )
 
     @staticmethod
