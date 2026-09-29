@@ -1,9 +1,12 @@
 {
   "extracted_fields": {
-    "invoice_number": "",
+    "document_no": "",
     "dete": "",
     "buyer": "",
     "seller": "",
-    "trn": ""
+    "trn": "",
+    "lpo":"",
+    "dn":"",
+    "sub total":""
   }
 }
