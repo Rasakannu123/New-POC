@@ -33,8 +33,11 @@ _GROUNDING_RULES = (
     "its layout, language, or document type. "
     "5. Never invent dates, amounts, names, or reference numbers, and "
     "never format or recompute values that are not printed as such. "
-    "6. Set confidence honestly: high (80-100) only when the text is "
-    "fully legible, low (0-30) when it is partially legible or blurry. "
+    "6. Set confidence honestly: high (70-89) only when the text is "
+    "fully legible and clearly labelled for that field, low (0-30) when "
+    "it is partially legible or blurry. "
+    "7. NEVER give a confidence score of 90 to 100. 89 is the maximum "
+    "possible score - no extraction is absolutely certain. "
 )
 
 
