@@ -3,9 +3,9 @@
     "document_no": "",
     "dete": "",
     "buyer": "",
+    "buyer-trn":"",
     "seller": "",
-    "trn": "",
-    "lpo":"",
+    "seller-trn": "",
     "dn":"",
     "sub total":""
   }

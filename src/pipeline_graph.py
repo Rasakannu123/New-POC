@@ -198,6 +198,7 @@ def build_graph() -> StateGraph:
     builder.add_node("route", route_node)
     builder.add_node("extract", extract_node)
     builder.add_node("output", output_node)
+    
     builder.add_edge(START, "convert")
     builder.add_edge("convert", "enhance")
     builder.add_edge("enhance", "assess")
