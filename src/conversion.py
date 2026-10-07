@@ -1,10 +1,10 @@
 """
 Image Conversion Layer (Core Component #2)
 ------------------------------------------
-Converts PDF documents into per-page, in-memory PIL images.
-
-The pipeline orchestrator then runs, per page:
-    Image Preprocessing Engine -> Quality Assessment Engine -> store.
+Converts a whole PDF document into per-page, in-memory PIL images in one
+render call. The converter works at document level only - once the document
+is converted into pages, every page is processed through the remaining
+features (enhance, assess, route, extract) and never converted again.
 
 Notes:
 - Poppler must be installed and available on the system PATH.
@@ -53,10 +53,10 @@ class ImageConversionLayer:
         self.dpi = dpi
 
     def convert_pages(self, pdf_path: Path | str) -> ConversionResult:
-        """Renders every page of the PDF to an image - the first feature of the
-        pipeline, because every later step works on page images. Failures are
-        returned as result.error instead of raising, so one broken PDF can
-        never crash the rest of the run."""
+        """Renders every page of the PDF to an image in one call - the first
+        feature of the pipeline, because every later step works on page
+        images. Failures are returned as result.error instead of raising, so
+        one broken PDF can never crash the rest of the run."""
         pdf_path = Path(pdf_path)
         result = ConversionResult(source_pdf=pdf_path)
 

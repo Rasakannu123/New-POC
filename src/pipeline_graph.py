@@ -1,15 +1,25 @@
 """
 LangGraph demo pipeline
 -----------------------
-One document is one asynchronous LangGraph run. Several documents are
-processed at the same time (up to MAX_CONCURRENT_DOCUMENTS from .env) and
-every document works through its pages one by one - as soon as one page is
-done the next page starts, and a document's results are delivered the moment
-that document finishes, without waiting for any other document.
+One document is one asynchronous pipeline run. Several documents are
+processed at the same time (up to MAX_CONCURRENT_DOCUMENTS), and within a
+document all pages are processed at the same time - each page is bounded
+only by the per-feature concurrency limits below, and a document's results
+are delivered the moment that document finishes, without waiting for any
+other document.
 
-Per page the graph runs:
+The converter runs once per document and turns the PDF into page images;
+the pages then run through the four page features of the graph:
 
-    convert -> enhance -> assess -> route -> extract -> (next page | output)
+    document: convert (all pages at once)
+    per page: enhance -> assess -> route -> extract -> END
+
+Every page feature has its own per-document concurrency limit
+(IMAGE_ENHANCEMENT_CONCURRENCY, QUALITY_ASSESSMENT_CONCURRENCY,
+MODEL_ROUTER_CONCURRENCY, DATA_EXTRACTION_CONCURRENCY), so each document
+limits how many of its own pages sit in a feature at once - and every
+document has those limits at the same time. The converter and the sixth
+feature, JSON output, run at document level and need no page limit.
 
 Every document gets a unique document ID ("0001") and every page a page ID
 ("0001/01"). Processing, routing and logging identify work by these IDs -
@@ -29,7 +39,7 @@ Every terminal message uses one aligned line format (src/console.py):
 
     TIME | SUBJECT | NODE | STATUS | LATENCY | DETAIL
 
-so the output stays readable while several documents interleave.
+so the output stays readable while several documents and pages interleave.
 """
 
 from __future__ import annotations
@@ -69,12 +79,26 @@ TOKEN_LIMIT_MESSAGE = (
     "Further model calls have been stopped."
 )
 
+ZERO_USAGE = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+
+
+def _build_gates() -> dict[str, asyncio.Semaphore]:
+    """One semaphore per feature for one document, so the configured
+    per-feature page concurrency is a per-document limit: every document
+    gets its own lanes and processes its pages under those limits at the
+    same time as the other documents."""
+    return {
+        node: asyncio.Semaphore(max(1, limit))
+        for node, limit in config.FEATURE_CONCURRENCY.items()
+    }
+
 
 @dataclass
 class DocumentContext:
     """Everything one document run needs besides page data: the engines, the
-    document identity, the token/retry budgets and the latency tracker. All
-    nodes share it, so budgets and timings accumulate across the document."""
+    document identity, the token/retry budgets, the latency tracker and the
+    concurrency gates. All pages of the document share it, so budgets and
+    timings accumulate across the document."""
 
     pdf_path: Path
     document_id: str
@@ -86,15 +110,17 @@ class DocumentContext:
     token_budget: TokenBudget
     retry_budget: RetryBudget
     latency: LatencyTracker
+    gates: dict[str, asyncio.Semaphore]
     page_ids: list[str] = field(default_factory=list)
-    enhanced_pages: list = field(default_factory=list)
+    page_count: int = 0
     token_limit_reported: bool = False
 
     @classmethod
     def create(cls, pdf_path: Path) -> DocumentContext:
         """Builds a fully configured context; the unique document ID is
         allocated here, before processing starts, so it stays stable even
-        when documents finish out of order."""
+        when documents finish out of order. The feature gates belong to this
+        document alone, so every document has its own concurrency limits."""
         return cls(
             pdf_path=pdf_path,
             document_id=allocate_document_id(),
@@ -108,22 +134,24 @@ class DocumentContext:
                 config.LLM_PAGE_RETRY_LIMIT, config.LLM_DOCUMENT_RETRY_LIMIT
             ),
             latency=LatencyTracker(config.LATENCY_THRESHOLDS),
+            gates=_build_gates(),
         )
 
 
-class PipelineState(TypedDict, total=False):
-    """The data handed from node to node - everything a later node needs, and
-    nothing more, so the state stays small and easy to follow."""
+class PageState(TypedDict, total=False):
+    """The data handed from node to node for one page - everything a later
+    node needs, and nothing more, so the state stays small and easy to
+    follow. The page image arrives already rendered, because the converter
+    runs once per document before any page starts."""
 
     ctx: DocumentContext
-    images: list
-    page_index: int
-    page_records: list[dict]
+    page_number: int
+    page_id: str
+    image: object
     enhanced_image: object
     assessment: dict
     routing: dict
-    output_json: str
-    error: str | None
+    record: dict
 
 
 def _start(subject: str, node: str) -> None:
@@ -132,9 +160,7 @@ def _start(subject: str, node: str) -> None:
     console.emit(subject, node, "STARTED", FEATURES[node])
 
 
-def _done(
-    subject: str, node: str, timing, detail: str = ""
-) -> None:
+def _done(subject: str, node: str, timing, detail: str = "") -> None:
     """Prints one node's finished line: processing status, latency against
     its threshold, and what the node produced."""
     console.emit(
@@ -147,140 +173,147 @@ def _done(
     )
 
 
-async def convert_node(state: PipelineState) -> dict:
-    """Feature 1 - turns the PDF into page images, because every later node
-    works per page image. Runs off the event loop so other documents keep
-    processing while Poppler renders. A broken PDF is recorded in state and
-    reported at the end of the run instead of crashing."""
-    ctx = state["ctx"]
-    _start(ctx.document_id, "convert")
-    with ctx.latency.measure("convert", ctx.document_id) as timing:
-        result = await asyncio.to_thread(
-            ctx.conversion.convert_pages, ctx.pdf_path
-        )
-    if not result.success:
-        error = result.error or "conversion failed"
-        _done(ctx.document_id, "convert", timing, f"failed; {error}")
-        return {"error": error}
-    if result.page_count == 0:
-        _done(ctx.document_id, "convert", timing, "failed; document has no pages")
-        return {"error": "document has no pages"}
-    ctx.page_ids = [
-        page_id_for(ctx.document_id, number)
-        for number in range(1, result.page_count + 1)
-    ]
-    _done(
-        ctx.document_id,
-        "convert",
-        timing,
-        f"{FEATURES['convert']}; {result.page_count} "
-        f"page{'s' if result.page_count != 1 else ''}",
-    )
-    return {"images": result.pages, "page_index": 0, "page_records": []}
+def _report_token_limit(ctx: DocumentContext) -> None:
+    """Announces once that the document's token budget is exhausted."""
+    if not ctx.token_limit_reported:
+        ctx.token_limit_reported = True
+        console.emit(ctx.document_id, "tokens", "STOPPED", TOKEN_LIMIT_MESSAGE)
 
 
-async def enhance_node(state: PipelineState) -> dict:
-    """Feature 2 - cleans up the current page image so OCR and the vision
-    model read it as clearly as possible."""
-    ctx = state["ctx"]
-    index = state["page_index"]
-    page_id = ctx.page_ids[index]
-    _start(page_id, "enhance")
-    with ctx.latency.measure("enhance", page_id) as timing:
-        image = await asyncio.to_thread(
-            ctx.preprocessing.enhance, state["images"][index]
-        )
-    ctx.enhanced_pages.append(image)
-    _done(page_id, "enhance", timing)
-    return {"enhanced_image": image}
-
-
-async def assess_node(state: PipelineState) -> dict:
-    """Feature 3 - scores the current page 0-100 and assigns a quality tier;
-    the scores are printed because they explain every later routing choice."""
-    ctx = state["ctx"]
-    index = state["page_index"]
-    page_id = ctx.page_ids[index]
-    _start(page_id, "assess")
-    with ctx.latency.measure("assess", page_id) as timing:
-        result = await asyncio.to_thread(ctx.quality.assess, state["enhanced_image"])
-    _done(page_id, "assess", timing, f"score {result.score} -> {result.tier}")
+def _blank_record(ctx: DocumentContext, page_number: int, page_id: str) -> dict:
+    """The metadata skeleton every page record starts from."""
     return {
-        "assessment": {
-            "page_id": page_id,
-            "score": result.score,
-            "tier": result.tier,
-        }
+        "page": page_number,
+        "page_id": page_id,
+        "image": None,
+        "status": "stopped",
+        "quality_score": None,
+        "quality_tier": None,
+        "model": None,
+        "extracted_fields": {},
+        "field_confidence_scores": {},
+        "success": False,
+        "error": None,
+        "processing_time": ctx.latency.subject_total(page_id),
+        "token_usage": dict(ZERO_USAGE),
+        "cumulative_tokens": ctx.token_budget.used,
+        "retries_used": 0,
     }
 
 
-async def route_node(state: PipelineState) -> dict:
+async def enhance_node(state: PageState) -> dict:
+    """Feature 2 - cleans up the page image so OCR and the vision model read
+    it as clearly as possible. The first node of the per-page pipeline: the
+    converter already rendered this page at document level."""
+    ctx = state["ctx"]
+    page_id = state["page_id"]
+    async with ctx.gates["enhance"]:
+        _start(page_id, "enhance")
+        with ctx.latency.measure("enhance", page_id) as timing:
+            image = await asyncio.to_thread(
+                ctx.preprocessing.enhance, state["image"]
+            )
+        _done(page_id, "enhance", timing)
+        return {"enhanced_image": image}
+
+
+async def assess_node(state: PageState) -> dict:
+    """Feature 3 - scores the page 0-100 and assigns a quality tier; the
+    scores are printed because they explain every later routing choice."""
+    ctx = state["ctx"]
+    page_id = state["page_id"]
+    async with ctx.gates["assess"]:
+        _start(page_id, "assess")
+        with ctx.latency.measure("assess", page_id) as timing:
+            result = await asyncio.to_thread(
+                ctx.quality.assess, state["enhanced_image"]
+            )
+        _done(page_id, "assess", timing, f"score {result.score} -> {result.tier}")
+        return {
+            "assessment": {
+                "page_id": page_id,
+                "score": result.score,
+                "tier": result.tier,
+            }
+        }
+
+
+async def route_node(state: PageState) -> dict:
     """Feature 4 - maps the page's tier to an extraction model, so clear pages
     use the cheap model and only hard pages pay for the strong one. The page
     ID is the routing key - never the file name."""
     ctx = state["ctx"]
     assessment = state["assessment"]
-    page_id = assessment["page_id"]
-    _start(page_id, "route")
-    with ctx.latency.measure("route", page_id) as timing:
-        decision = await asyncio.to_thread(
-            ctx.router.route,
-            QualityAssessment(
-                score=assessment["score"], tier=assessment["tier"]
-            ),
-        )
-    _done(page_id, "route", timing, f"model {decision.model}")
-    return {
-        "routing": {
-            "page_id": page_id,
-            "model": decision.model,
-            "tier": decision.tier,
-            "score": decision.score,
+    page_id = state["page_id"]
+    async with ctx.gates["route"]:
+        _start(page_id, "route")
+        with ctx.latency.measure("route", page_id) as timing:
+            decision = await asyncio.to_thread(
+                ctx.router.route,
+                QualityAssessment(
+                    score=assessment["score"], tier=assessment["tier"]
+                ),
+            )
+        _done(page_id, "route", timing, f"model {decision.model}")
+        return {
+            "routing": {
+                "page_id": page_id,
+                "model": decision.model,
+                "tier": decision.tier,
+                "score": decision.score,
+            }
         }
-    }
 
 
-async def extract_node(state: PipelineState) -> dict:
-    """Feature 5 - the model call that turns the current page image into
-    fields and confidence scores. Retries and token usage are accounted per
-    page and cumulated per document; when the document's token limit is hit,
-    no further page may make a model call."""
+async def extract_node(state: PageState) -> dict:
+    """Feature 5 - the model call that turns the page image into fields and
+    confidence scores. Retries and token usage are accounted per page and
+    cumulated per document; when the document's token limit is hit, no
+    further page may make a model call."""
     ctx = state["ctx"]
-    index = state["page_index"]
-    page_id = ctx.page_ids[index]
-    _start(page_id, "extract")
+    page_id = state["page_id"]
     routing = state["routing"]
     decision = RoutingDecision(
         model=routing["model"],
         tier=routing["tier"],
         score=routing["score"],
     )
-    with ctx.latency.measure("extract", page_id) as timing:
-        result = await ctx.extractor.extract(
-            state["enhanced_image"],
-            decision,
-            retry_budget=ctx.retry_budget,
-            subject=page_id,
-        )
-    usage = ctx.token_budget.record(result.input_tokens, result.output_tokens)
 
-    status = "completed" if result.success else "failed"
-    detail = [
-        status,
-        f"tokens {usage.total_tokens} (input {usage.input_tokens}, output {usage.output_tokens})",
-        f"cumulative {ctx.token_budget.used}",
-    ]
-    if result.error:
-        detail.insert(1, result.error)
-    if result.retries_used:
-        detail.append(f"retries {result.retries_used}")
-    _done(page_id, "extract", timing, "; ".join(detail))
+    async with ctx.gates["extract"]:
+        if ctx.token_budget.exhausted:
+            _report_token_limit(ctx)
+            record = _blank_record(ctx, state["page_number"], page_id)
+            record["error"] = TOKEN_LIMIT_MESSAGE
+            record["quality_score"] = routing["score"]
+            record["quality_tier"] = routing["tier"]
+            return {"record": record}
+        _start(page_id, "extract")
+        with ctx.latency.measure("extract", page_id) as timing:
+            result = await ctx.extractor.extract(
+                state["enhanced_image"],
+                decision,
+                retry_budget=ctx.retry_budget,
+                subject=page_id,
+            )
+        usage = ctx.token_budget.record(result.input_tokens, result.output_tokens)
+
+        status = "completed" if result.success else "failed"
+        detail = [
+            status,
+            f"tokens {usage.total_tokens} (input {usage.input_tokens}, output {usage.output_tokens})",
+            f"cumulative {ctx.token_budget.used}",
+        ]
+        if result.error:
+            detail.insert(1, result.error)
+        if result.retries_used:
+            detail.append(f"retries {result.retries_used}")
+        _done(page_id, "extract", timing, "; ".join(detail))
 
     assessment = state["assessment"]
     record = {
-        "page": index + 1,
+        "page": state["page_number"],
         "page_id": page_id,
-        "image": f"page-{index + 1:02d}.{config.IMAGE_FORMAT}",
+        "image": f"page-{state['page_number']:02d}.{config.IMAGE_FORMAT}",
         "status": status,
         "quality_score": assessment["score"],
         "quality_tier": assessment["tier"],
@@ -299,94 +332,60 @@ async def extract_node(state: PipelineState) -> dict:
         "retries_used": result.retries_used,
     }
 
-    more_pages = index + 1 < len(state["images"])
-    if more_pages and ctx.token_budget.exhausted and not ctx.token_limit_reported:
-        ctx.token_limit_reported = True
-        console.emit(ctx.document_id, "tokens", "STOPPED", TOKEN_LIMIT_MESSAGE)
-
-    return {
-        "page_records": state["page_records"] + [record],
-        "page_index": index + 1,
-    }
+    if ctx.token_budget.exhausted:
+        _report_token_limit(ctx)
+    return {"record": record}
 
 
-def _after_convert(state: PipelineState) -> str:
-    """A broken document goes straight to output (which writes nothing) so the
-    error can be reported; a healthy one starts with its first page."""
-    if state.get("error"):
-        return "output"
-    return "enhance"
+def build_graph() -> StateGraph:
+    """Wires the four per-page feature nodes into one LangGraph pipeline -
+    the graph is what makes the run order and the per-feature progress
+    explicit. The document runner invokes it once per page, concurrently.
+    The converter and JSON output run at document level, around the graph."""
+    builder = StateGraph(PageState)
+    builder.add_node("enhance", enhance_node)
+    builder.add_node("assess", assess_node)
+    builder.add_node("route", route_node)
+    builder.add_node("extract", extract_node)
+
+    builder.add_edge(START, "enhance")
+    builder.add_edge("enhance", "assess")
+    builder.add_edge("assess", "route")
+    builder.add_edge("route", "extract")
+    builder.add_edge("extract", END)
+    return builder
 
 
-def _after_extract(state: PipelineState) -> str:
-    """Loops back for the next page - one page at a time - and stops the loop
-    early when the document's token limit is reached."""
-    ctx = state["ctx"]
-    more_pages = state["page_index"] < len(state["images"])
-    if more_pages and not ctx.token_budget.exhausted:
-        return "enhance"
-    return "output"
-
-
-def output_node(state: PipelineState) -> dict:
+def _write_output(
+    ctx: DocumentContext, pages: list[dict], images: dict[int, object]
+) -> str | None:
     """Feature 6 - writes the enhanced page images and result.json; this file
     is the final data the web UI displays, so score, tier, model and fields
     are merged per page here, and every page ID ends up in the metadata.
-    Pages skipped by the token limit are recorded as "stopped". Nothing is
-    written when nothing was extracted."""
-    records = state.get("page_records")
-    if not records:
-        return {}
-    ctx = state["ctx"]
-    _start(ctx.document_id, "output")
+    Nothing is written when nothing was processed."""
+    if not pages:
+        return None
     directory = config.OUTPUT_DIR / ctx.pdf_path.stem
     directory.mkdir(parents=True, exist_ok=True)
 
+    _start(ctx.document_id, "output")
     with ctx.latency.measure("output", ctx.document_id) as timing:
-        pages = list(records)
-        for record in records:
-            image_name = record["image"]
-            ctx.enhanced_pages[record["page"] - 1].save(directory / image_name)
-        for number in range(len(records) + 1, len(state["images"]) + 1):
-            page_id = ctx.page_ids[number - 1]
-            console.emit(
-                page_id,
-                "extract",
-                "STOPPED",
-                "no model call made - token limit reached",
-            )
-            pages.append(
-                {
-                    "page": number,
-                    "page_id": page_id,
-                    "image": None,
-                    "status": "stopped",
-                    "quality_score": None,
-                    "quality_tier": None,
-                    "model": None,
-                    "extracted_fields": {},
-                    "field_confidence_scores": {},
-                    "success": False,
-                    "error": TOKEN_LIMIT_MESSAGE,
-                    "processing_time": 0.0,
-                    "token_usage": {
-                        "input_tokens": 0,
-                        "output_tokens": 0,
-                        "total_tokens": 0,
-                    },
-                    "cumulative_tokens": ctx.token_budget.used,
-                    "retries_used": 0,
-                }
-            )
-
-        record = {
-            "document": ctx.pdf_path.name,
-            "document_id": ctx.document_id,
-            "pages": pages,
-        }
+        for record in pages:
+            image = images.get(record["page"])
+            if image is not None and record["image"]:
+                image.save(directory / record["image"])
         output_json = directory / "result.json"
         output_json.write_text(
-            json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8"
+            json.dumps(
+                {
+                    "document": ctx.pdf_path.name,
+                    "document_id": ctx.document_id,
+                    "pages": pages,
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
         )
     _done(
         ctx.document_id,
@@ -395,33 +394,7 @@ def output_node(state: PipelineState) -> dict:
         f"{FEATURES['output']}; {len(pages)} "
         f"page{'s' if len(pages) != 1 else ''}; result.json",
     )
-    return {"output_json": str(output_json)}
-
-
-def build_graph() -> StateGraph:
-    """Wires the six feature nodes into one LangGraph pipeline - the graph is
-    what makes the run order and the per-feature progress explicit. The two
-    conditional edges loop the page nodes once per page."""
-    builder = StateGraph(PipelineState)
-    builder.add_node("convert", convert_node)
-    builder.add_node("enhance", enhance_node)
-    builder.add_node("assess", assess_node)
-    builder.add_node("route", route_node)
-    builder.add_node("extract", extract_node)
-    builder.add_node("output", output_node)
-
-    builder.add_edge(START, "convert")
-    builder.add_conditional_edges(
-        "convert", _after_convert, {"enhance": "enhance", "output": "output"}
-    )
-    builder.add_edge("enhance", "assess")
-    builder.add_edge("assess", "route")
-    builder.add_edge("route", "extract")
-    builder.add_conditional_edges(
-        "extract", _after_extract, {"enhance": "enhance", "output": "output"}
-    )
-    builder.add_edge("output", END)
-    return builder
+    return str(output_json)
 
 
 def _finalize(output_json: str, ctx: DocumentContext) -> None:
@@ -466,10 +439,12 @@ def _report_latency(ctx: DocumentContext) -> None:
 
 
 async def run_async(pdf_files: list[Path] | None = None) -> int:
-    """Runs the graph once per PDF (or for the given files) concurrently:
-    up to MAX_CONCURRENT_DOCUMENTS documents at a time, each document page by
-    page, results reported in the order documents finish. Returns a shell
-    exit code, so both main.py and the web UI share the exact same pipeline."""
+    """Runs the pipeline once per PDF (or for the given files) concurrently:
+    up to MAX_CONCURRENT_DOCUMENTS documents at a time, all pages of a
+    document at a time, and every feature bounded by its own concurrency
+    limit. Results are reported in the order documents finish. Returns a
+    shell exit code, so both main.py and the web UI share the exact same
+    pipeline."""
     console.install()
     config.INPUT_DIR.mkdir(parents=True, exist_ok=True)
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -487,30 +462,93 @@ async def run_async(pdf_files: list[Path] | None = None) -> int:
         return 0
 
     graph = build_graph().compile()
-    semaphore = asyncio.Semaphore(max(1, config.MAX_CONCURRENT_DOCUMENTS))
+    document_semaphore = asyncio.Semaphore(
+        max(1, config.MAX_CONCURRENT_DOCUMENTS)
+    )
 
     async def process_one(pdf_path: Path) -> bool:
         """Processes one document and reports its result the moment it is
         done - documents finish independently and out of order."""
         ctx = DocumentContext.create(pdf_path)
-        async with semaphore:
+        async with document_semaphore:
             console.emit(ctx.document_id, "document", "STARTED", pdf_path.name)
-            try:
-                state = await graph.ainvoke(
-                    {"ctx": ctx, "page_index": 0, "page_records": []}
+
+            with ctx.latency.measure("convert", ctx.document_id) as timing:
+                converted = await asyncio.to_thread(
+                    ctx.conversion.convert_pages, ctx.pdf_path
                 )
-            except Exception as exc:
-                logger.exception("Pipeline crashed for %s", ctx.document_id)
-                console.emit(ctx.document_id, "document", "FAILED", str(exc))
+            if not converted.success:
+                message = converted.error or "conversion failed"
+                _done(ctx.document_id, "convert", timing, f"failed; {message}")
+                console.emit(ctx.document_id, "document", "FAILED", message)
                 return False
-        if state.get("error"):
-            console.emit(ctx.document_id, "document", "FAILED", state["error"])
-            return False
-        output_json = state.get("output_json", "")
+            count = converted.page_count
+            if count == 0:
+                message = "document has no pages"
+                _done(ctx.document_id, "convert", timing, f"failed; {message}")
+                console.emit(ctx.document_id, "document", "FAILED", message)
+                return False
+            _done(
+                ctx.document_id,
+                "convert",
+                timing,
+                f"{FEATURES['convert']}; {count} "
+                f"page{'s' if count != 1 else ''}",
+            )
+            ctx.page_count = count
+            ctx.page_ids = [
+                page_id_for(ctx.document_id, number)
+                for number in range(1, count + 1)
+            ]
+
+            async def process_page(number: int) -> tuple[dict, object]:
+                """Runs one already-rendered page through the graph; all
+                pages of the document start together and are throttled only
+                by the per-feature limits. A page whose token budget is gone
+                never starts."""
+                page_id = ctx.page_ids[number - 1]
+                if ctx.token_budget.exhausted:
+                    _report_token_limit(ctx)
+                    record = _blank_record(ctx, number, page_id)
+                    record["error"] = TOKEN_LIMIT_MESSAGE
+                    return record, None
+                try:
+                    state = await graph.ainvoke(
+                        {
+                            "ctx": ctx,
+                            "page_number": number,
+                            "page_id": page_id,
+                            "image": converted.pages[number - 1],
+                        }
+                    )
+                except Exception as exc:
+                    logger.exception("Pipeline crashed for %s", page_id)
+                    record = _blank_record(ctx, number, page_id)
+                    record["status"] = "failed"
+                    record["error"] = str(exc)
+                    return record, None
+                if state.get("record"):
+                    return state["record"], state.get("enhanced_image")
+                record = _blank_record(ctx, number, page_id)
+                record["status"] = "failed"
+                record["error"] = "page processing failed"
+                return record, None
+
+            results = await asyncio.gather(
+                *(process_page(number) for number in range(1, count + 1))
+            )
+
+        pages = sorted((record for record, _ in results), key=lambda r: r["page"])
+        images = {
+            record["page"]: image
+            for record, image in results
+            if image is not None
+        }
+        output_json = _write_output(ctx, pages, images)
         if output_json:
             _finalize(output_json, ctx)
         _report_latency(ctx)
-        console.emit(ctx.document_id, "result", "SAVED", output_json)
+        console.emit(ctx.document_id, "result", "SAVED", output_json or "-")
         return True
 
     results = await asyncio.gather(*(process_one(pdf) for pdf in pdf_files))

@@ -14,22 +14,19 @@ Tier thresholds:
     50-80  -> blurry
     < 50   -> very_blurry
 
-Thread safety: pytesseract calls run in parallel up to config.OCR_CONCURRENCY,
-guarded by an instance semaphore; each call is an independent Tesseract
-subprocess.
+Thread safety: how many pages are assessed in parallel is controlled at the
+pipeline level by QUALITY_ASSESSMENT_CONCURRENCY; each assessment is an
+independent Tesseract subprocess.
 """
 
 from __future__ import annotations
 
 import logging
 import shutil
-import threading
 from dataclasses import dataclass
 
 import numpy as np
 from PIL import Image
-
-from src import config
 
 logger = logging.getLogger(__name__)
 
@@ -58,14 +55,13 @@ class QualityAssessmentEngine:
         blurry_threshold: float = 50.0,
         ocr_config: str = "--psm 3",
     ) -> None:
-        """Loads Tesseract once and caps parallel OCR calls, so processing
-        several pages never spawns an unbounded number of subprocesses."""
+        """Loads Tesseract once; the pipeline's QUALITY_ASSESSMENT_CONCURRENCY
+        limit decides how many pages are scored at the same time."""
         self.clear_threshold = float(clear_threshold)
         self.blurry_threshold = float(blurry_threshold)
         self.ocr_config = ocr_config
 
         self._pytesseract = None
-        self._ocr_semaphore = threading.Semaphore(config.OCR_CONCURRENCY)
         self._init_ocr()
 
     def assess(self, image: Image.Image) -> QualityAssessment:
@@ -93,12 +89,11 @@ class QualityAssessmentEngine:
             return 0.0
 
         try:
-            with self._ocr_semaphore:
-                data = self._pytesseract.image_to_data(
-                    gray,
-                    output_type=self._pytesseract.Output.DICT,
-                    config=self.ocr_config,
-                )
+            data = self._pytesseract.image_to_data(
+                gray,
+                output_type=self._pytesseract.Output.DICT,
+                config=self.ocr_config,
+            )
 
             all_confidences: list[float] = []
             all_char_weights: list[int] = []

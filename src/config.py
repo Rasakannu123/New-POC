@@ -36,12 +36,23 @@ TIER_MODEL_MAP = {
 # --- Pipeline settings -----------------------------------------------------
 DPI = int(os.getenv("DPI", "300"))
 IMAGE_FORMAT = os.getenv("IMAGE_FORMAT", "png")
-OCR_CONCURRENCY = int(os.getenv("OCR_CONCURRENCY", "4"))
 
 # --- Asynchronous processing -----------------------------------------------
 # Maximum number of documents processed at the same time; the remaining
-# documents wait in a queue. Each document always works on one page at a time.
+# documents wait in a queue. All pages of a document run concurrently,
+# bounded only by the per-feature limits below.
 MAX_CONCURRENT_DOCUMENTS = int(os.getenv("MAX_CONCURRENT_DOCUMENTS", "4"))
+
+# Per-feature page concurrency: how many pages of one document may be
+# inside each page feature at the same time. Every document has its own
+# limits, so documents run at the same time without sharing lanes. The
+# converter is not here - it runs once per document, before pages start.
+FEATURE_CONCURRENCY = {
+    "enhance": int(os.getenv("IMAGE_ENHANCEMENT_CONCURRENCY", "5")),
+    "assess": int(os.getenv("QUALITY_ASSESSMENT_CONCURRENCY", "3")),
+    "route": int(os.getenv("MODEL_ROUTER_CONCURRENCY", "2")),
+    "extract": int(os.getenv("DATA_EXTRACTION_CONCURRENCY", "4")),
+}
 
 # --- Latency thresholds per node (seconds) ---------------------------------
 # A node slower than its threshold is reported as OVER-THRESHOLD in the

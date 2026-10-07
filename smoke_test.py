@@ -1,9 +1,9 @@
 """
-Smoke test for the async pipeline (Tasks 1-6).
+Smoke test for the async pipeline (Tasks 1-6 + concurrent page processing).
 
 Runs the real LangGraph pipeline against generated PDFs and a fake model
-client, so retries, token limits and document concurrency can be verified
-deterministically without calling the real gateway.
+client, so page concurrency, feature limits, retries and token limits can be
+verified deterministically without calling the real gateway.
 
 Usage:
     python smoke_test.py
@@ -29,28 +29,65 @@ WORK = config.OUTPUT_DIR / "_smoke"
 
 MODEL_REPLY = '{"doc_type": {"value": "Invoice", "confidence": 80}}'
 
+FEATURE_CONCURRENCY_DEFAULTS = dict(config.FEATURE_CONCURRENCY)
+
+
+class FakeTracker:
+    """Watermark of concurrent fake model calls."""
+
+    def __init__(self) -> None:
+        self.active = 0
+        self.max_active = 0
+
+    def enter(self) -> None:
+        self.active += 1
+        self.max_active = max(self.max_active, self.active)
+
+    def leave(self) -> None:
+        self.active -= 1
+
 
 class FakeCreate:
     """Fake chat.completions.create: fails the first N calls, then succeeds."""
 
-    def __init__(self, failures: int, delay: float = 0.05) -> None:
+    def __init__(
+        self,
+        failures: int,
+        delay: float = 0.05,
+        tracker: FakeTracker | None = None,
+    ) -> None:
         self.failures = failures
         self.delay = delay
+        self.tracker = tracker
         self.calls = 0
 
     async def create(self, **kwargs):
         self.calls += 1
-        await asyncio.sleep(self.delay)
-        if self.calls <= self.failures:
-            raise RuntimeError("simulated API failure")
-        message = SimpleNamespace(content=MODEL_REPLY)
-        usage = SimpleNamespace(prompt_tokens=100, completion_tokens=30)
-        return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
+        if self.tracker:
+            self.tracker.enter()
+        try:
+            await asyncio.sleep(self.delay)
+            if self.calls <= self.failures:
+                raise RuntimeError("simulated API failure")
+            message = SimpleNamespace(content=MODEL_REPLY)
+            usage = SimpleNamespace(prompt_tokens=100, completion_tokens=30)
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=message)], usage=usage
+            )
+        finally:
+            if self.tracker:
+                self.tracker.leave()
 
 
-def fake_engine(failures: int, delay: float = 0.05) -> ExtractionEngine:
+def fake_engine(
+    failures: int,
+    delay: float = 0.05,
+    tracker: FakeTracker | None = None,
+) -> ExtractionEngine:
     client = SimpleNamespace(
-        chat=SimpleNamespace(completions=FakeCreate(failures, delay))
+        chat=SimpleNamespace(
+            completions=FakeCreate(failures, delay, tracker)
+        )
     )
     return ExtractionEngine(client=client)
 
@@ -107,6 +144,7 @@ def test_token_limit() -> None:
     print("\n[test] token limit stops further model calls (Task 6)")
     config.DOCUMENT_TOKEN_LIMIT = 400
     config.LLM_PAGE_RETRY_LIMIT = 0
+    config.FEATURE_CONCURRENCY["extract"] = 1
     pdf = make_pdf(WORK / "_smoke_tokens.pdf", 5)
     pg.ExtractionEngine = lambda *a, **k: fake_engine(failures=0)
     exit_code = pg.run([pdf])
@@ -114,17 +152,20 @@ def test_token_limit() -> None:
     record = load_result(pdf)
     pages = record["pages"]
     check(len(pages) == 5, "all 5 pages are in the metadata")
+    completed = [p for p in pages if p["status"] == "completed"]
+    stopped = [p for p in pages if p["status"] == "stopped"]
+    check(len(completed) == 4, "4 pages completed (4 x 130 = 520 tokens)")
+    check(len(stopped) == 1, "the 5th page is stopped")
     check(
-        all(p["status"] == "completed" for p in pages[:4]),
-        "pages 1-4 completed (130+130+130+130 = 520 tokens)",
+        sorted(p["cumulative_tokens"] for p in completed) == [130, 260, 390, 520],
+        "cumulative tokens grow by 130 per call to 520",
     )
-    check(pages[3]["cumulative_tokens"] == 520, "cumulative tokens = 520 after page 4")
-    check(pages[4]["status"] == "stopped", "page 5 is stopped")
-    check(pages[4]["image"] is None, "stopped page has no image")
-    check("Token limit" in pages[4]["error"], "stopped page explains the token limit")
+    check(stopped[0]["image"] is None, "stopped page has no image")
+    check("Token limit" in stopped[0]["error"], "stopped page explains the token limit")
     check(record["token_usage"]["limit_reached"], "document metadata flags the limit")
     check(
-        pages[0]["token_usage"] == {
+        completed[0]["token_usage"]
+        == {
             "input_tokens": 100,
             "output_tokens": 30,
             "total_tokens": 130,
@@ -138,14 +179,15 @@ def test_page_and_document_retry_limits() -> None:
     config.DOCUMENT_TOKEN_LIMIT = 0
     config.LLM_PAGE_RETRY_LIMIT = 2
     config.LLM_DOCUMENT_RETRY_LIMIT = 3
+    config.FEATURE_CONCURRENCY["extract"] = 1
     pdf = make_pdf(WORK / "_smoke_retries.pdf", 3)
     pg.ExtractionEngine = lambda *a, **k: fake_engine(failures=99)
     exit_code = pg.run([pdf])
     check(exit_code == 0, "run succeeds even when every call fails")
     record = load_result(pdf)
     pages = record["pages"]
-    retries = [p["retries_used"] for p in pages]
-    check(retries == [2, 1, 0], f"retries per page {retries} (page 2, document 3 limit)")
+    retries = sorted(p["retries_used"] for p in pages)
+    check(retries == [0, 1, 2], f"retries per page {retries} (page 2, document 3 limit)")
     check(all(p["status"] == "failed" for p in pages), "pages are marked failed")
     check(record["retry_usage"]["retries_used"] == 3, "document retries capped at 3")
 
@@ -165,8 +207,73 @@ def test_retry_then_success() -> None:
     check(page["extracted_fields"] == {"doc_type": "Invoice"}, "fields parsed")
 
 
+def test_page_concurrency() -> None:
+    print("\n[test] several pages process at the same time")
+    config.DOCUMENT_TOKEN_LIMIT = 0
+    config.LLM_PAGE_RETRY_LIMIT = 0
+    config.FEATURE_CONCURRENCY["extract"] = 4
+    pdf = make_pdf(WORK / "_smoke_window.pdf", 6)
+    tracker = FakeTracker()
+    pg.ExtractionEngine = lambda *a, **k: fake_engine(
+        failures=0, delay=1.0, tracker=tracker
+    )
+    exit_code = pg.run([pdf])
+    check(exit_code == 0, "run succeeds")
+    check(
+        tracker.max_active <= 4,
+        "never more model calls at once than DATA_EXTRACTION_CONCURRENCY (4)",
+    )
+    check(tracker.max_active >= 2, "pages actually overlap")
+    record = load_result(pdf)
+    check(
+        all(p["status"] == "completed" for p in record["pages"]),
+        "all 6 pages completed",
+    )
+    check(
+        [p["page"] for p in record["pages"]] == [1, 2, 3, 4, 5, 6],
+        "metadata still lists pages in order",
+    )
+
+
+def test_feature_concurrency_limit() -> None:
+    print("\n[test] per-feature limit binds for concurrent pages")
+    config.FEATURE_CONCURRENCY["extract"] = 2
+    pdf = make_pdf(WORK / "_smoke_feature_limit.pdf", 6)
+    tracker = FakeTracker()
+    pg.ExtractionEngine = lambda *a, **k: fake_engine(
+        failures=0, delay=1.0, tracker=tracker
+    )
+    exit_code = pg.run([pdf])
+    check(exit_code == 0, "run succeeds")
+    check(tracker.max_active <= 2, "DATA_EXTRACTION_CONCURRENCY=2 never exceeded")
+    check(tracker.max_active == 2, "the limit is actually reached")
+    config.FEATURE_CONCURRENCY["extract"] = 4
+
+
+def test_per_document_lanes() -> None:
+    print("\n[test] feature limits are per document (scenario B)")
+    config.DOCUMENT_TOKEN_LIMIT = 0
+    config.LLM_PAGE_RETRY_LIMIT = 0
+    config.FEATURE_CONCURRENCY["extract"] = 1
+    pdfs = [
+        make_pdf(WORK / "_smoke_lane_a.pdf", 3),
+        make_pdf(WORK / "_smoke_lane_b.pdf", 3),
+    ]
+    tracker = FakeTracker()
+    pg.ExtractionEngine = lambda *a, **k: fake_engine(
+        failures=0, delay=0.6, tracker=tracker
+    )
+    exit_code = pg.run(pdfs)
+    check(exit_code == 0, "both documents succeed")
+    check(
+        tracker.max_active == 2,
+        f"one page per document extracts at once (max {tracker.max_active})",
+    )
+    config.FEATURE_CONCURRENCY["extract"] = 4
+
+
 def test_document_concurrency() -> None:
-    print("\n[test] documents run together, pages one by one (Task 1)")
+    print("\n[test] documents run together, pages together (Task 1)")
     config.DOCUMENT_TOKEN_LIMIT = 0
     config.LLM_PAGE_RETRY_LIMIT = 0
     config.MAX_CONCURRENT_DOCUMENTS = 2
@@ -202,6 +309,7 @@ def test_document_concurrency() -> None:
         == {"convert", "enhance", "assess", "route", "extract", "output"},
         "all six nodes have latency totals (Tasks 3-4)",
     )
+    config.MAX_CONCURRENT_DOCUMENTS = 4
 
 
 def main() -> None:
@@ -212,6 +320,9 @@ def main() -> None:
         test_token_limit()
         test_page_and_document_retry_limits()
         test_retry_then_success()
+        test_page_concurrency()
+        test_feature_concurrency_limit()
+        test_per_document_lanes()
         test_document_concurrency()
     finally:
         pg.ExtractionEngine = real_engine
@@ -219,6 +330,7 @@ def main() -> None:
         config.LLM_PAGE_RETRY_LIMIT = 2
         config.LLM_DOCUMENT_RETRY_LIMIT = 5
         config.MAX_CONCURRENT_DOCUMENTS = 4
+        config.FEATURE_CONCURRENCY.update(FEATURE_CONCURRENCY_DEFAULTS)
         shutil.rmtree(WORK, ignore_errors=True)
         for directory in config.OUTPUT_DIR.glob("_smoke_*"):
             if directory.is_dir() and directory.resolve().is_relative_to(
