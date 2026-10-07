@@ -10,8 +10,8 @@ Routing table (from .env):
     very_blurry  (<50)   -> TIER_VERY_BLURRY_MODEL
 
 The router itself is a pure, local decision - no API call is needed for
-routing. `create_client()` builds the OpenAI-compatible gateway client
-used by extraction.
+routing. `create_async_client()` builds the async OpenAI-compatible gateway
+client used by extraction.
 """
 
 from __future__ import annotations
@@ -68,9 +68,10 @@ class ModelRouter:
         )
 
     @staticmethod
-    def create_client():
-        """Builds the OpenAI-compatible gateway client used for extraction;
-        it lives here so the gateway settings are configured in one place."""
-        from openai import OpenAI
+    def create_async_client():
+        """Builds the async gateway client used by the pipeline, so LLM
+        network calls never block the event loop and several documents can
+        wait for their models at the same time."""
+        from openai import AsyncOpenAI
 
-        return OpenAI(api_key=config.API_KEY, base_url=config.BASE_URL)
+        return AsyncOpenAI(api_key=config.API_KEY, base_url=config.BASE_URL)

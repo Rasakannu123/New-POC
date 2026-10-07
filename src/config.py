@@ -36,8 +36,36 @@ TIER_MODEL_MAP = {
 # --- Pipeline settings -----------------------------------------------------
 DPI = int(os.getenv("DPI", "300"))
 IMAGE_FORMAT = os.getenv("IMAGE_FORMAT", "png")
-POPPLER_PATH = os.getenv("POPPLER_PATH") or None
 OCR_CONCURRENCY = int(os.getenv("OCR_CONCURRENCY", "4"))
+
+# --- Asynchronous processing -----------------------------------------------
+# Maximum number of documents processed at the same time; the remaining
+# documents wait in a queue. Each document always works on one page at a time.
+MAX_CONCURRENT_DOCUMENTS = int(os.getenv("MAX_CONCURRENT_DOCUMENTS", "4"))
+
+# --- Latency thresholds per node (seconds) ---------------------------------
+# A node slower than its threshold is reported as OVER-THRESHOLD in the
+# terminal; it never fails the run.
+LATENCY_THRESHOLDS = {
+    "convert": float(os.getenv("LATENCY_THRESHOLD_CONVERT", "120")),
+    "enhance": float(os.getenv("LATENCY_THRESHOLD_ENHANCE", "30")),
+    "assess": float(os.getenv("LATENCY_THRESHOLD_ASSESS", "60")),
+    "route": float(os.getenv("LATENCY_THRESHOLD_ROUTE", "5")),
+    "extract": float(os.getenv("LATENCY_THRESHOLD_EXTRACT", "120")),
+    "output": float(os.getenv("LATENCY_THRESHOLD_OUTPUT", "30")),
+}
+
+# --- LLM retry limits ------------------------------------------------------
+# Retries per page after a failed API call, and the total retries allowed for
+# one document. 0 means "never retry".
+LLM_PAGE_RETRY_LIMIT = int(os.getenv("LLM_PAGE_RETRY_LIMIT", "2"))
+LLM_DOCUMENT_RETRY_LIMIT = int(os.getenv("LLM_DOCUMENT_RETRY_LIMIT", "5"))
+
+# --- Token limits ----------------------------------------------------------
+# Cumulative model token budget (input + output) for one document; when it is
+# reached, no further model calls are made for that document.
+# 0 (or less) means unlimited.
+DOCUMENT_TOKEN_LIMIT = int(os.getenv("DOCUMENT_TOKEN_LIMIT", "100000"))
 
 INPUT_DIR = Path(os.getenv("INPUT_DIR") or PROJECT_ROOT / "data" / "input")
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR") or PROJECT_ROOT / "data" / "output")

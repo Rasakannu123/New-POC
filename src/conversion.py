@@ -7,14 +7,12 @@ The pipeline orchestrator then runs, per page:
     Image Preprocessing Engine -> Quality Assessment Engine -> store.
 
 Notes:
-- Poppler location is resolved from the POPPLER_PATH environment
-  variable when set, otherwise Poppler must be on the system PATH.
+- Poppler must be installed and available on the system PATH.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -29,9 +27,9 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 POPPLER_HELP = (
-    "Poppler was not found. Install Poppler for Windows and either add its "
-    "'bin' folder to the system PATH or set the POPPLER_PATH environment "
-    "variable to that folder (e.g. C:\\poppler-26.02.0\\Library\\bin)."
+    "Poppler was not found. Install Poppler for Windows and add its "
+    "'bin' folder to the system PATH "
+    "(e.g. C:\\poppler-26.02.0\\Library\\bin)."
 )
 
 
@@ -49,11 +47,10 @@ class ConversionResult:
 class ImageConversionLayer:
     """Converts each page of a PDF into an in-memory image."""
 
-    def __init__(self, dpi: int = 300, poppler_path: str | None = None) -> None:
-        """Keeps the render DPI and the optional Poppler location, so callers
-        can override them without touching environment variables."""
+    def __init__(self, dpi: int = 300) -> None:
+        """Keeps the render DPI, so callers can override it without touching
+        environment variables."""
         self.dpi = dpi
-        self.poppler_path = poppler_path or os.getenv("POPPLER_PATH")
 
     def convert_pages(self, pdf_path: Path | str) -> ConversionResult:
         """Renders every page of the PDF to an image - the first feature of the
@@ -67,7 +64,6 @@ class ImageConversionLayer:
             pages = convert_from_path(
                 str(pdf_path),
                 dpi=self.dpi,
-                poppler_path=self.poppler_path,
             )
         except PDFInfoNotInstalledError:
             result.error = POPPLER_HELP

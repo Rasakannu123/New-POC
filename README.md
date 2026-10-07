@@ -39,8 +39,7 @@ pip install -r requirements.txt
 copy .env.example .env   # then fill in API_KEY and BASE_URL
 ```
 
-Requires Poppler (PDF rendering) and Tesseract (OCR) on PATH,
-or set `POPPLER_PATH` in `.env`.
+Requires Poppler (PDF rendering) and Tesseract (OCR) on PATH.
 
 ## Run
 

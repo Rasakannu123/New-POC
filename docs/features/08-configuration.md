@@ -13,7 +13,6 @@
 **Value lookup.** Every setting is read with `os.getenv(name, default)`. Two parsing details matter:
 
 - `DPI` and `OCR_CONCURRENCY` are wrapped in `int()` ([src/config.py:37](../../src/config.py#L37), [src/config.py:40](../../src/config.py#L40)) — a non-numeric value raises `ValueError` at import.
-- `POPPLER_PATH = os.getenv("POPPLER_PATH") or None` ([src/config.py:39](../../src/config.py#L39)) — an empty string becomes `None`, so `pdf2image` falls back to searching the system `PATH`.
 - `INPUT_DIR` / `OUTPUT_DIR` ([src/config.py:42](../../src/config.py#L42)-[43](../../src/config.py#L43)) use the same `or` trick: an empty env value falls back to `PROJECT_ROOT/data/input` and `PROJECT_ROOT/data/output`. (These two keys are honored by the code but are not listed in `.env.example`.)
 
 **`_load_template_fields` fallback.** The helper at [src/config.py:53](../../src/config.py#L53)-[66](../../src/config.py#L66) reads the extraction template JSON and returns the list of field names. It never raises:
@@ -43,7 +42,6 @@ Complete list of keys in [`.env.example`](../../.env.example), with defaults tak
 | `TIER_VERY_BLURRY_MODEL` | Extraction model for the `very_blurry` quality tier | value of `IMAGE_MODEL_LARGE` | Optional |
 | `DPI` | Resolution for PDF → image rendering | `300` | Optional (`int`; non-numeric raises `ValueError` at import) |
 | `IMAGE_FORMAT` | Image output format | `png` | Optional |
-| `POPPLER_PATH` | Folder containing the Poppler binaries for `pdf2image`; empty = search system `PATH` | `None` | Optional |
 | `OCR_CONCURRENCY` | Number of parallel OCR-confidence calls | `4` | Optional (`int`; non-numeric raises `ValueError` at import) |
 | `TEMPLATE_PATH` | Path to the extraction template JSON | `PROJECT_ROOT/data/Template/test.json` | Optional (missing/broken file → free-form extraction) |
 
@@ -117,7 +115,7 @@ The fallback is two-level: each `TIER_*_MODEL` defaults to the corresponding `IM
 
 **System binaries:**
 
-- **Poppler** — required by `pdf2image` for PDF rendering. Located via `POPPLER_PATH` (the folder containing the binaries, e.g. `C:\poppler-26.02.0\Library\bin`) or the system `PATH`. If Poppler is missing, conversion fails gracefully with an install hint (see Error Handling).
+- **Poppler** — required by `pdf2image` for PDF rendering. It must be installed with its binaries on the system `PATH` (e.g. `C:\poppler-26.02.0\Library\bin`). If Poppler is missing, conversion fails gracefully with an install hint (see Error Handling).
 - **Tesseract OCR** — optional. Only needed for the OCR-confidence quality metric: `src/quality.py` enables it when `pytesseract` is importable *and* `shutil.which("tesseract")` finds the binary on `PATH` ([src/quality.py:146](../../src/quality.py#L146)-[164](../../src/quality.py#L164)). Without it the pipeline still runs; the OCR-confidence signal degrades to `0`.
 
 ## Error Handling & Edge Cases
@@ -130,7 +128,7 @@ The fallback is two-level: each `TIER_*_MODEL` defaults to the corresponding `IM
 | Broken template JSON | `json.JSONDecodeError` is caught the same way → `[]` → free-form extraction. |
 | Template that is neither dict nor list | Returns `[]` → free-form extraction. |
 | Template dict without `extracted_fields` | The dict's own top-level keys become the field names ([src/config.py:61](../../src/config.py#L61)). |
-| Empty `POPPLER_PATH` | Becomes `None`; `pdf2image` searches `PATH`. If Poppler is still missing, conversion catches `PDFInfoNotInstalledError` and returns a `result.error` with install instructions instead of raising ([src/conversion.py:72](../../src/conversion.py#L72)-[75](../../src/conversion.py#L75)). |
+| Poppler not on `PATH` | `pdf2image` raises `PDFInfoNotInstalledError`; conversion catches it and returns a `result.error` with install instructions instead of raising ([src/conversion.py:68](../../src/conversion.py#L68)-[71](../../src/conversion.py#L71)). |
 | `pytesseract` not installed or `tesseract` binary not on `PATH` | Warning is logged and the OCR-confidence metric returns `0`; the rest of the pipeline is unaffected ([src/quality.py:146](../../src/quality.py#L146)-[164](../../src/quality.py#L164)). |
 | `OMP_THREAD_LIMIT` already set in the environment | `setdefault` leaves the existing value untouched ([src/config.py:71](../../src/config.py#L71)). |
 | Empty `INPUT_DIR` / `OUTPUT_DIR` / `TEMPLATE_PATH` | Falls back to the built-in default paths under `PROJECT_ROOT`. |
@@ -150,8 +148,7 @@ Module-level constants and functions exposed by `src/config.py` (all resolved at
 | `TIER_MODEL_MAP` | `dict[str, str]` | [src/config.py:30](../../src/config.py#L30) | Maps `clear` / `blurry` / `very_blurry` quality tiers to model ids (`TIER_*_MODEL`, defaulting to the `IMAGE_MODEL_*` values). |
 | `DPI` | `int` | [src/config.py:37](../../src/config.py#L37) | PDF render DPI from `DPI`; default `300`. |
 | `IMAGE_FORMAT` | `str` | [src/config.py:38](../../src/config.py#L38) | Image format from `IMAGE_FORMAT`; default `"png"`. |
-| `POPPLER_PATH` | `str \| None` | [src/config.py:39](../../src/config.py#L39) | Poppler binary folder from `POPPLER_PATH`; empty → `None`. |
-| `OCR_CONCURRENCY` | `int` | [src/config.py:40](../../src/config.py#L40) | Parallel OCR calls from `OCR_CONCURRENCY`; default `4`. |
+| `OCR_CONCURRENCY` | `int` | [src/config.py:39](../../src/config.py#L39) | Parallel OCR calls from `OCR_CONCURRENCY`; default `4`. |
 | `INPUT_DIR` | `Path` | [src/config.py:42](../../src/config.py#L42) | Input PDF directory from `INPUT_DIR`; default `PROJECT_ROOT/data/input`. |
 | `OUTPUT_DIR` | `Path` | [src/config.py:43](../../src/config.py#L43) | Output directory from `OUTPUT_DIR`; default `PROJECT_ROOT/data/output`. |
 | `TEMPLATE_PATH` | `Path` | [src/config.py:48](../../src/config.py#L48) | Template JSON path from `TEMPLATE_PATH`; default `PROJECT_ROOT/data/Template/test.json`. |
