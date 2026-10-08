@@ -28,7 +28,7 @@ never by file name - and both IDs are stored in the result metadata.
 Each node measures its latency against a configurable threshold (Task 3), the
 total processing time of the document is reported and stored in the page
 metadata (Task 4), failed model calls are retried within per-page and
-per-document limits (Task 5), and the cumulative token usage of the document
+per-document limits (Task 5), and the running token total of the document
 stops all further model calls once its token limit is reached (Task 6).
 
 Output per document (data/output/<name>/):
@@ -196,7 +196,7 @@ def _blank_record(ctx: DocumentContext, page_number: int, page_id: str) -> dict:
         "error": None,
         "processing_time": ctx.latency.subject_total(page_id),
         "token_usage": dict(ZERO_USAGE),
-        "cumulative_tokens": ctx.token_budget.used,
+        "document_total_tokens": ctx.token_budget.used,
         "retries_used": 0,
     }
 
@@ -301,7 +301,7 @@ async def extract_node(state: PageState) -> dict:
         detail = [
             status,
             f"tokens {usage.total_tokens} (input {usage.input_tokens}, output {usage.output_tokens})",
-            f"cumulative {ctx.token_budget.used}",
+            f"document total {ctx.token_budget.used} tokens",
         ]
         if result.error:
             detail.insert(1, result.error)
@@ -328,7 +328,7 @@ async def extract_node(state: PageState) -> dict:
             "output_tokens": usage.output_tokens,
             "total_tokens": usage.total_tokens,
         },
-        "cumulative_tokens": ctx.token_budget.used,
+        "document_total_tokens": ctx.token_budget.used,
         "retries_used": result.retries_used,
     }
 

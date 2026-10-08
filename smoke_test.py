@@ -157,8 +157,8 @@ def test_token_limit() -> None:
     check(len(completed) == 4, "4 pages completed (4 x 130 = 520 tokens)")
     check(len(stopped) == 1, "the 5th page is stopped")
     check(
-        sorted(p["cumulative_tokens"] for p in completed) == [130, 260, 390, 520],
-        "cumulative tokens grow by 130 per call to 520",
+        sorted(p["document_total_tokens"] for p in completed) == [130, 260, 390, 520],
+        "document total tokens grow by 130 per call to 520",
     )
     check(stopped[0]["image"] is None, "stopped page has no image")
     check("Token limit" in stopped[0]["error"], "stopped page explains the token limit")

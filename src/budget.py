@@ -3,9 +3,9 @@ Token and retry budgets
 -----------------------
 Two budgets shared by every model call of one document:
 
-- TokenBudget: cumulative input+output tokens of the whole document. When the
-  limit is reached the document stops making model calls (the limits apply to
-  the document as a whole, never per page).
+- TokenBudget: the running total of input+output tokens of the whole
+  document. When the limit is reached the document stops making model calls
+  (the limits apply to the document as a whole, never per page).
 - RetryBudget: how often a failed API call may be retried - limited per page
   AND per document, so one broken page cannot burn the whole document's
   retries.
@@ -29,7 +29,7 @@ class TokenUsage:
 
 
 class TokenBudget:
-    """Cumulative model-token budget for one document."""
+    """Model-token budget for one document, tracked as a running total."""
 
     def __init__(self, limit: int) -> None:
         """limit <= 0 means unlimited."""
@@ -39,7 +39,7 @@ class TokenBudget:
 
     def record(self, input_tokens: int, output_tokens: int) -> TokenUsage:
         """Adds one model call's token usage and returns it, so the caller can
-        store the per-page numbers next to the cumulative total."""
+        store the per-page numbers next to the document total."""
         usage = TokenUsage(
             input_tokens=max(0, int(input_tokens or 0)),
             output_tokens=max(0, int(output_tokens or 0)),
@@ -50,7 +50,7 @@ class TokenBudget:
 
     @property
     def exhausted(self) -> bool:
-        """True once the cumulative usage reached (or passed) the limit."""
+        """True once the document's token total reached (or passed) the limit."""
         return self.limit > 0 and self.used >= self.limit
 
 

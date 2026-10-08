@@ -73,7 +73,7 @@ LLM_PAGE_RETRY_LIMIT = int(os.getenv("LLM_PAGE_RETRY_LIMIT", "2"))
 LLM_DOCUMENT_RETRY_LIMIT = int(os.getenv("LLM_DOCUMENT_RETRY_LIMIT", "5"))
 
 # --- Token limits ----------------------------------------------------------
-# Cumulative model token budget (input + output) for one document; when it is
+# Total model token budget (input + output) for one document; when it is
 # reached, no further model calls are made for that document.
 # 0 (or less) means unlimited.
 DOCUMENT_TOKEN_LIMIT = int(os.getenv("DOCUMENT_TOKEN_LIMIT", "100000"))

@@ -14,7 +14,7 @@ mechanics: sending the request, shrinking the image, parsing the reply.
 - A failed API call is retried within the per-page and per-document retry
   limits (src/budget.py).
 - Token usage returned by the model is recorded per call, so the document
-  can enforce its cumulative token limit.
+  can enforce its total token limit.
 - Images are downscaled to max 2048 px on the long side before sending.
 - Responses are parsed robustly (code fences stripped, first JSON object
   extracted). A failed page never stops the pipeline.
@@ -145,7 +145,7 @@ class ExtractionEngine:
     @staticmethod
     def _record_token_usage(result: ExtractionResult, response) -> None:
         """Reads the token usage returned by the model (input + output), so
-        the document can track its cumulative token consumption. A gateway
+        the document can track its running token total. A gateway
         that reports no usage simply counts as zero."""
         usage = getattr(response, "usage", None)
         result.input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
