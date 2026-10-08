@@ -52,6 +52,13 @@ def index() -> HTMLResponse:
     return HTMLResponse(UI_PATH.read_text(encoding="utf-8"))
 
 
+@app.get("/health")
+def health() -> dict:
+    """Health-check endpoint for probes and monitors, so they stop getting
+    404 from the pipeline UI."""
+    return {"status": "ok"}
+
+
 @app.get("/api/files")
 def list_files() -> dict:
     """Shows the PDFs in data/input so the user can see what can be processed

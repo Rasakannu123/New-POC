@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "One Document, Two Pages - pipeline_graph.py Start to End",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/pipeline-workflow.html"
+  },
+  "lanes": [
+    { "id": "entrydoc", "label": "Entry & Document Graph (build_document_graph)" },
+    { "id": "page", "label": "Page Graph (build_page_graph)" },
+    { "id": "gateway", "label": "Model Gateway" }
+  ],
+  "phases": [
+    { "id": "setup", "label": "Start + context", "fromCol": 0, "toCol": 1 },
+    { "id": "render", "label": "Convert document", "fromCol": 2, "toCol": 2 },
+    { "id": "pages_phase", "label": "Pages + delivery", "fromCol": 3, "toCol": 5, "variant": "emphasis" }
+  ],
+  "mainPath": ["run", "context", "convert", "pages", "enhance", "assess", "route", "extract", "output"],
+  "nodes": [
+    { "id": "run", "lane": "entrydoc", "col": 0, "type": "frontend", "width": 155, "label": "run()", "sublabel": "run_async() - logger - FEATURES" },
+    { "id": "context", "lane": "entrydoc", "col": 1, "type": "backend", "width": 175, "label": "DocumentContext.create()", "sublabel": "_build_gates() - IDs 0001 / 0001-01" },
+    { "id": "convert", "lane": "entrydoc", "col": 2, "type": "backend", "width": 150, "label": "convert_node", "sublabel": "_start - _done - DocumentState" },
+    { "id": "pages", "lane": "entrydoc", "col": 3, "type": "messagebus", "width": 145, "label": "pages_node", "sublabel": "PageState - 0001-01 + 0001-02" },
+    { "id": "enhance", "lane": "page", "col": 3, "type": "backend", "width": 115, "label": "enhance_node", "sublabel": "Feature 2 - clean image" },
+    { "id": "assess", "lane": "page", "col": 4, "type": "backend", "width": 120, "label": "assess_node", "sublabel": "Feature 3 - score to tier" },
+    { "id": "route", "lane": "page", "col": 5, "type": "backend", "width": 120, "label": "route_node", "sublabel": "Feature 4 - tier to model" },
+    { "id": "extract", "lane": "gateway", "col": 5, "type": "external", "width": 185, "label": "extract_node", "sublabel": "_blank_record - _report_token_limit" },
+    { "id": "output", "lane": "entrydoc", "col": 5, "type": "database", "width": 215, "label": "output_node", "sublabel": "_write_output - _finalize - _report_latency" }
+  ],
+  "edges": [
+    { "from": "run", "to": "context" },
+    { "from": "context", "to": "convert" },
+    { "from": "convert", "to": "pages" },
+    { "from": "pages", "to": "enhance", "label": "each page", "labelDy": 43, "variant": "emphasis", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "from": "enhance", "to": "assess" },
+    { "from": "assess", "to": "route" },
+    { "from": "route", "to": "extract", "label": "model", "labelDy": 39, "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "from": "extract", "to": "output", "label": "records" }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Start to end",
+      "items": [
+        "One document = 1 document-graph run + 2 page-graph runs (0001/01 + 0001/02)",
+        "TOKEN_LIMIT_MESSAGE + ZERO_USAGE cover stopped pages in result.json"
+      ]
+    }
+  ]
+}
