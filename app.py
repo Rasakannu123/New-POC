@@ -1,14 +1,3 @@
-"""
-Minimal web UI for the demo: upload a PDF, run the pipeline, view results.
-
-The pipeline itself keeps printing the current feature to this terminal.
-
-Run:
-    python app.py   ->  http://127.0.0.1:8000
-"""
-
-from __future__ import annotations
-
 import json
 from pathlib import Path
 
@@ -25,16 +14,12 @@ UI_PATH = Path(__file__).resolve().parent / "ui.html"
 
 
 def _safe_name(name: str) -> str:
-    """Reject path tricks (../, folders) because browser-supplied names are
-    used directly in file paths - this is the one security check the UI needs."""
     if name != Path(name).name or name in {".", ".."}:
         raise HTTPException(status_code=400, detail="invalid file name")
     return name
 
 
 def _results() -> list[dict]:
-    """Collects every result.json so the data view can list processed documents
-    without knowing their names in advance."""
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     results = []
     for directory in sorted(config.OUTPUT_DIR.iterdir()):
@@ -48,21 +33,16 @@ def _results() -> list[dict]:
 
 @app.get("/")
 def index() -> HTMLResponse:
-    """Serves the single UI page - everything the user sees lives in ui.html."""
     return HTMLResponse(UI_PATH.read_text(encoding="utf-8"))
 
 
 @app.get("/health")
 def health() -> dict:
-    """Health-check endpoint for probes and monitors, so they stop getting
-    404 from the pipeline UI."""
     return {"status": "ok"}
 
 
 @app.get("/api/files")
 def list_files() -> dict:
-    """Shows the PDFs in data/input so the user can see what can be processed
-    and pick one."""
     config.INPUT_DIR.mkdir(parents=True, exist_ok=True)
     items = [
         {"name": path.name, "size": path.stat().st_size}
@@ -74,8 +54,6 @@ def list_files() -> dict:
 
 @app.post("/api/upload")
 def upload(files: list[UploadFile] = File(...)) -> dict:
-    """Stores uploaded PDFs in data/input, the same folder the CLI uses, so
-    web-uploaded and hand-copied documents behave identically."""
     config.INPUT_DIR.mkdir(parents=True, exist_ok=True)
     saved = []
     for upload_file in files:
@@ -89,9 +67,6 @@ def upload(files: list[UploadFile] = File(...)) -> dict:
 
 @app.post("/api/process")
 def process(file: str | None = None) -> dict:
-    """Runs the pipeline (one file or everything) and returns the fresh results
-    so the page can show data immediately - the terminal shows the features
-    while this request waits for the run to finish."""
     if file:
         pdf_path = config.INPUT_DIR / _safe_name(file)
         if not pdf_path.is_file():
@@ -104,14 +79,11 @@ def process(file: str | None = None) -> dict:
 
 @app.get("/api/results")
 def results() -> dict:
-    """Lists processed documents for the data view's document buttons."""
     return {"results": _results()}
 
 
 @app.get("/api/results/{name}")
 def result(name: str) -> dict:
-    """Returns one document's full extraction record (fields, scores, models)
-    so the data view can render the per-page tables."""
     name = _safe_name(name)
     record_path = config.OUTPUT_DIR / name / "result.json"
     if not record_path.is_file():
@@ -123,8 +95,6 @@ def result(name: str) -> dict:
 
 @app.get("/api/output/{name}/{file_name}")
 def output_file(name: str, file_name: str) -> FileResponse:
-    """Serves the enhanced page images so the data view can show the page
-    next to its extracted fields."""
     name = _safe_name(name)
     file_name = _safe_name(file_name)
     path = config.OUTPUT_DIR / name / file_name

@@ -1,33 +1,10 @@
 # Secrets - never commit
 .env
 
-# Python
 __pycache__/
-*.py[cod]
-*.egg-info/
 .venv/
-venv/
-.codegraph/
 
-# Runtime data folders - keep the folders, ignore the contents
 data/input/*
 data/output/*
-data/skip/*
-data/Manual-Review/*
-data/runs/*
 !data/input/.gitkeep
 !data/output/.gitkeep
-
-# Runtime state
-data/checkpoints.sqlite
-
-# Test caches
-.pytest_cache/
-
-# OS / editor
-Thumbs.db
-.DS_Store
-.vscode/
-
-# Dependencies
-node_modules/

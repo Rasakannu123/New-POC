@@ -8,7 +8,7 @@ pipeline. Every step prints the feature it is working on to the terminal.
 ```
 data/input/*.pdf
    -> Convert     (PDF -> page images)
-   -> Enhance     (grayscale, deblur, denoise, deskew, CLAHE)
+   -> Enhance     (grayscale, deblur, denoise)
    -> Assess      (0-100 OCR-confidence score + tier)
    -> Route       (quality tier -> vision model)
    -> Extract     (fields + confidence via the vision model)
@@ -19,9 +19,9 @@ data/input/*.pdf
 
 | Tier | Score | Model |
 |---|---|---|
-| clear | > 80 | `IMAGE_MODEL_SMALL` |
-| blurry | 50-80 | `IMAGE_MODEL_MEDIUM` |
-| very_blurry | < 50 | `IMAGE_MODEL_LARGE` |
+| clear | > 80 | `TIER_CLEAR_MODEL` |
+| blurry | 50-80 | `TIER_BLURRY_MODEL` |
+| very_blurry | < 50 | `TIER_VERY_BLURRY_MODEL` |
 
 ## Output
 
@@ -44,19 +44,13 @@ Requires Poppler (PDF rendering) and Tesseract (OCR) on PATH.
 ## Run
 
 ```
-python main.py                    # every PDF in data/input
-python main.py path/to/file.pdf   # one specific PDF
-```
-
-## Simple web UI (upload + data view)
-
-```
 python app.py                     # then open http://127.0.0.1:8000
 ```
 
 One page with three steps: upload a PDF, process it, and view the extracted
 data (page image, quality score, model, fields). The terminal still shows
-each feature while the pipeline runs.
+each feature while the pipeline runs. The "Process all" button handles every
+PDF in `data/input` at once.
 
-All configuration (gateway URL, API key, model IDs, tier mapping, DPI,
-paths) lives in `.env`.
+All configuration (gateway URL, API key, model IDs, tier mapping, paths)
+lives in `.env`.

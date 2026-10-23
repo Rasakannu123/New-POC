@@ -1,22 +1,11 @@
-# Configuration
-python-dotenv>=1.0.0
-
-# PDF -> images
-pdf2image>=1.17.0
-Pillow>=10.0.0
-
-# Image enhancement + quality assessment
-opencv-python>=4.8.0
-numpy>=1.24.0
-pytesseract>=0.3.10
-
-# Data extraction (OpenAI-compatible gateway)
-openai>=1.0.0
-
-# LangGraph pipeline
-langgraph>=0.2.0
-
-# Simple upload + data view UI (app.py / ui.html)
-fastapi>=0.110.0
-uvicorn>=0.29.0
-python-multipart>=0.0.9
+python-dotenv>=1.0.0     # src/config.py - loads the .env settings and secrets
+pdf2image>=1.17.0        # src/conversion.py - renders each PDF page into an image (needs the Poppler program)
+Pillow>=10.0.0           # src/ (PIL) - image convert/resize/save in conversion, preprocessing, quality, extraction
+opencv-python>=4.8.0     # src/preprocessing.py (cv2) - image enhancement: grayscale, deblur, denoise
+numpy>=1.24.0            # src/preprocessing.py, src/quality.py - pixel math for enhancement and OCR scoring
+pytesseract>=0.3.10      # src/quality.py - Tesseract OCR word confidence -> quality score and tier
+openai>=1.0.0            # src/router.py - AsyncOpenAI gateway client for the extraction model calls
+langgraph>=0.2.0         # src/pipeline_graph.py - builds the document graph and the per-page graph
+fastapi>=0.110.0         # app.py - web UI server: upload, process and results endpoints
+uvicorn>=0.29.0          # app.py - runs the web server on http://127.0.0.1:8000
+python-multipart>=0.0.9  # app.py - lets FastAPI parse the PDF upload form (used indirectly, never imported)

@@ -1,20 +1,3 @@
-"""
-All prompts live here
----------------------
-Every instruction sent to an AI model is collected in this one file, so the
-wording can be reviewed and tuned without touching pipeline logic.
-
-Current prompts:
-    - build_extraction_prompt()  the data-extraction request (feature 5)
-
-Rules of thumb for editing prompts:
-    - keep the grounding rules strict: models invent plausible values
-      whenever the wording gives them room to guess.
-    - keep the output format fixed: only one JSON object, no markdown.
-"""
-
-from __future__ import annotations
-
 from src import config
 
 MAX_FIELDS = 10
@@ -42,10 +25,6 @@ _GROUNDING_RULES = (
 
 
 def build_extraction_prompt(template_fields: list[str] | None = None) -> str:
-    """Build the extraction prompt, optionally locked to template fields.
-
-    The grounding rules exist because vision models happily invent plausible
-    values - the prompt forces them to transcribe only what is legible."""
     if template_fields:
         field_list = ", ".join(f'"{name}"' for name in template_fields)
         scope = (

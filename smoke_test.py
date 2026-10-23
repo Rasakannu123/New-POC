@@ -1,18 +1,3 @@
-"""
-Smoke test for the async pipeline (Tasks 1-6 + concurrent page processing).
-
-Runs the real LangGraph pipeline against generated PDFs and a fake model
-client, so page concurrency, feature limits, retries and token limits can be
-verified deterministically without calling the real gateway.
-
-Usage:
-    python smoke_test.py
-
-Everything it creates lives under data/output/_smoke and is deleted at the end.
-"""
-
-from __future__ import annotations
-
 import asyncio
 import json
 import re
@@ -24,7 +9,6 @@ from src import config
 from src import pipeline_graph as pg
 from src.extraction import ExtractionEngine
 
-ROOT = Path(__file__).resolve().parent
 WORK = config.OUTPUT_DIR / "_smoke"
 
 MODEL_REPLY = '{"doc_type": {"value": "Invoice", "confidence": 80}}'
@@ -33,8 +17,6 @@ FEATURE_CONCURRENCY_DEFAULTS = dict(config.FEATURE_CONCURRENCY)
 
 
 class FakeTracker:
-    """Watermark of concurrent fake model calls."""
-
     def __init__(self) -> None:
         self.active = 0
         self.max_active = 0
@@ -48,8 +30,6 @@ class FakeTracker:
 
 
 class FakeCreate:
-    """Fake chat.completions.create: fails the first N calls, then succeeds."""
-
     def __init__(
         self,
         failures: int,
@@ -93,7 +73,6 @@ def fake_engine(
 
 
 def make_pdf(path: Path, pages: int) -> Path:
-    """Writes a minimal valid multi-page PDF (grey rectangle per page)."""
     kids = " ".join(f"{3 + 2 * i} 0 R" for i in range(pages))
     objects: dict[int, bytes] = {
         1: b"<< /Type /Catalog /Pages 2 0 R >>",

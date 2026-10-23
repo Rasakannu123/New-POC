@@ -1,25 +1,3 @@
-"""
-Quality Assessment Engine (Core Component #4)
----------------------------------------------
-Calculates a 0-100 quality score for each enhanced page image.
-
-    1. Content        -> Tesseract per-word OCR confidence
-    2. Readable words -> confidence >= 30 (stamps, borders, handwriting dropped)
-    3. Quality Score  -> char-weighted mean of readable words
-    4. Tier           -> clear / blurry / very_blurry
-
-Tier thresholds:
-    > 80   -> clear
-    50-80  -> blurry
-    < 50   -> very_blurry
-
-Thread safety: how many pages are assessed in parallel is controlled at the
-pipeline level by QUALITY_ASSESSMENT_CONCURRENCY; each assessment is an
-independent Tesseract subprocess.
-"""
-
-from __future__ import annotations
-
 import logging
 import shutil
 from dataclasses import dataclass
@@ -39,36 +17,24 @@ _OCR_MAX_SIDE = 1500
 
 @dataclass
 class QualityAssessment:
-    """Quality result for a single page image."""
-
     score: float
     tier: str
 
 
 class QualityAssessmentEngine:
-    """Scores page-image quality using Tesseract OCR confidence only."""
-
     def __init__(
         self,
         clear_threshold: float = 80.0,
         blurry_threshold: float = 50.0,
         ocr_config: str = "--oem 1 --psm 6 -c tessedit_do_invert=0",
     ) -> None:
-        """Loads Tesseract once; the pipeline's QUALITY_ASSESSMENT_CONCURRENCY
-        limit decides how many pages are scored at the same time."""
         self.clear_threshold = float(clear_threshold)
         self.blurry_threshold = float(blurry_threshold)
         self.ocr_config = ocr_config
-
         self._pytesseract = None
         self._init_ocr()
 
     def assess(self, image: Image.Image) -> QualityAssessment:
-        """Produces the 0-100 score and quality tier - the decision input for
-        the model router, so pages that need an expensive model can be told
-        apart from pages that do not. The OCR runs on a downscaled copy: the
-        score is a confidence estimate, so full 300-DPI resolution is wasted
-        work."""
         if max(image.size) > _OCR_MAX_SIDE:
             scale = _OCR_MAX_SIDE / max(image.size)
             image = image.resize(
@@ -87,9 +53,6 @@ class QualityAssessmentEngine:
         return QualityAssessment(score=score, tier=tier)
 
     def _ocr_confidence_score(self, gray: np.ndarray) -> float:
-        """Measures how confidently Tesseract reads the page. Junk words below
-        the confidence floor (stamps, borders, handwriting) are excluded so they
-        cannot inflate the score."""
         if self._pytesseract is None:
             return 0.0
 
@@ -100,13 +63,10 @@ class QualityAssessmentEngine:
                 config=self.ocr_config,
             )
 
-            readable_confidences: list[float] = []
-            readable_char_weights: list[int] = []
+            confidences: list[float] = []
+            weights: list[int] = []
 
-            for text, confidence in zip(
-                data.get("text", []),
-                data.get("conf", []),
-            ):
+            for text, confidence in zip(data.get("text", []), data.get("conf", [])):
                 text = str(text or "").strip()
                 if not text:
                     continue
@@ -116,21 +76,15 @@ class QualityAssessmentEngine:
                     continue
                 if conf < 0.0:
                     continue
-                char_count = len("".join(text.split()))
-                if char_count <= 0:
-                    continue
                 clipped = float(np.clip(conf, 0.0, 100.0))
                 if clipped >= READABLE_MIN_CONFIDENCE:
-                    readable_confidences.append(clipped)
-                    readable_char_weights.append(char_count)
+                    confidences.append(clipped)
+                    weights.append(len("".join(text.split())))
 
-            if not readable_confidences or not readable_char_weights:
+            if not confidences:
                 return 0.0
 
-            mean_confidence = float(
-                np.average(readable_confidences, weights=readable_char_weights)
-            )
-
+            mean_confidence = float(np.average(confidences, weights=weights))
             return float(np.clip(mean_confidence, 0.0, 100.0))
 
         except Exception as exc:
@@ -138,20 +92,14 @@ class QualityAssessmentEngine:
             return 0.0
 
     def _init_ocr(self) -> None:
-        """Turns OCR on when Tesseract is installed and degrades gracefully to
-        score 0 when it is not, so the pipeline still runs without OCR."""
         try:
             import pytesseract
         except ImportError:
-            logger.warning(
-                "pytesseract not installed - OCR confidence will be 0."
-            )
+            logger.warning("pytesseract not installed - OCR confidence will be 0.")
             return
 
         if shutil.which("tesseract") is None:
-            logger.warning(
-                "Tesseract binary not found on PATH - OCR confidence will be 0."
-            )
+            logger.warning("Tesseract binary not found on PATH - OCR confidence will be 0.")
             return
 
         self._pytesseract = pytesseract
