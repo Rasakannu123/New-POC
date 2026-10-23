@@ -10,6 +10,45 @@ never fails the run - the thresholds are a monitoring tool, not a gate.
 The recorded timings feed the terminal status lines (src/console.py), the
 overall document latency report and the total processing time stored in the
 page metadata.
+
+1. def measure(node, subject)
+Purpose: Times one specific step (e.g., "enhance" for page "0001/01") and returns a timing object. Example Output:
+
+Code block
+
+
+NodeTiming(node='enhance', subject='0001/01', seconds=12.5, threshold=30.0, exceeded=False)
+2. def subject_total(subject)
+Purpose: Sums up all time spent on one specific page across all steps. Example Output:
+
+Code block
+
+
+45.2
+(Meaning: Page '0001/01' spent 12.5s enhancing + 20s assessing + 12.7s extracting = 45.2s total)
+
+3. def node_totals()
+Purpose: Sums up time for each feature across the whole document (all pages combined). Example Output:
+
+json
+
+
+{
+  "convert": 12.0, 
+  "enhance": 25.0, 
+  "assess": 40.0, 
+  "extract": 60.0
+}
+(Meaning: All pages together took 12s to convert, 25s to enhance, etc.)
+
+4. def total()
+Purpose: The grand sum of all work done in the document (sum of node_totals). Example Output:
+
+Code block
+
+
+137.0
+(Meaning: 12.0 + 25.0 + 40.0 + 60.0 = 137.0 seconds of CPU/work time)
 """
 
 from __future__ import annotations

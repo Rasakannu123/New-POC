@@ -1,0 +1,41 @@
+10:50:31 | 0001     | document | STARTED        |                                    | AL TAHER - 21542 1.pdf
+10:50:31 | 0001     | convert  | STARTED        |                                    | PDF-to-Images converter
+10:50:35 | 0001     | convert  | OVER-THRESHOLD | latency   4.13s (threshold   1.0s) | PDF-to-Images converter; 4 pages
+10:50:35 | 0001/01  | enhance  | STARTED        |                                    | Image enhancement
+10:50:35 | 0001/02  | enhance  | STARTED        |                                    | Image enhancement
+10:50:35 | 0001/03  | enhance  | STARTED        |                                    | Image enhancement
+10:50:35 | 0001/04  | enhance  | STARTED        |                                    | Image enhancement
+10:50:46 | 0001/02  | enhance  | OVER-THRESHOLD | latency  10.58s (threshold   5.0s) | Image enhancement
+10:50:46 | 0001/02  | assess   | STARTED        |                                    | Quality assessment of images
+10:50:46 | 0001/04  | enhance  | OVER-THRESHOLD | latency  10.77s (threshold   5.0s) | Image enhancement
+10:50:46 | 0001/04  | assess   | STARTED        |                                    | Quality assessment of images
+10:50:46 | 0001/01  | enhance  | OVER-THRESHOLD | latency  10.96s (threshold   5.0s) | Image enhancement
+10:50:46 | 0001/01  | assess   | STARTED        |                                    | Quality assessment of images
+10:50:47 | 0001/03  | enhance  | OVER-THRESHOLD | latency  11.30s (threshold   5.0s) | Image enhancement
+10:50:47 | 0001/03  | assess   | STARTED        |                                    | Quality assessment of images
+10:50:53 | 0001/01  | assess   | OVER-THRESHOLD | latency   7.18s (threshold   5.0s) | score 87.6 -> clear
+10:50:53 | 0001/04  | assess   | OVER-THRESHOLD | latency   7.36s (threshold   5.0s) | score 84.7 -> clear
+10:50:53 | 0001/01  | route    | STARTED        |                                    | Model router based on the quality score
+10:50:53 | 0001/04  | route    | STARTED        |                                    | Model router based on the quality score
+10:50:53 | 0001/01  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+10:50:53 | 0001/04  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+10:50:53 | 0001/01  | extract  | STARTED        |                                    | Data extraction
+10:51:01 | 0001/04  | extract  | STARTED        |                                    | Data extraction
+10:51:01 | 0001/02  | assess   | OVER-THRESHOLD | latency  15.37s (threshold   5.0s) | score 79.6 -> blurry
+10:51:01 | 0001/03  | assess   | OVER-THRESHOLD | latency  14.66s (threshold   5.0s) | score 84.3 -> clear
+10:51:01 | 0001/02  | route    | STARTED        |                                    | Model router based on the quality score
+10:51:01 | 0001/03  | route    | STARTED        |                                    | Model router based on the quality score
+10:51:01 | 0001/02  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.8-max:free
+10:51:01 | 0001/03  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+10:51:01 | 0001/02  | extract  | STARTED        |                                    | Data extraction
+10:51:02 | 0001/03  | extract  | STARTED        |                                    | Data extraction
+10:51:10 | 0001/03  | extract  | OVER-THRESHOLD | latency   8.64s (threshold   5.0s) | completed; tokens 3312 (input 3067, output 245); document total 3312 tokens
+10:51:11 | 0001/02  | extract  | OVER-THRESHOLD | latency   9.75s (threshold   5.0s) | completed; tokens 3344 (input 3067, output 277); document total 6656 tokens
+10:51:11 | 0001     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+10:51:11 | 0001/04  | extract  | OVER-THRESHOLD | latency  10.34s (threshold   5.0s) | completed; tokens 3308 (input 3067, output 241); document total 9964 tokens
+10:51:15 | 0001/01  | extract  | OVER-THRESHOLD | latency  21.92s (threshold   5.0s) | completed; tokens 3355 (input 3067, output 288); document total 13319 tokens
+10:51:15 | 0001     | output   | STARTED        |                                    | JSON output
+10:51:17 | 0001     | output   | OK             | latency   1.47s (threshold   5.0s) | JSON output; 4 pages; result.json
+10:51:17 | 0001     | summary  | COMPLETED      | latency 144.43s (document total)   | node times: convert 4.13s; enhance 43.61s; assess 44.57s; route 0.00s; extract 50.65s; output 1.47s
+10:51:17 | 0001     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\AL TAHER - 21542 1\result.json
+10:51:17 | run      | summary  | COMPLETED      |                                    | 1 succeeded, 0 failed

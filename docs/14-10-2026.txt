@@ -1,0 +1,457 @@
+12:46:59 | 0006     | document | STARTED        |                                    | AL TAHER - 21542 1.pdf
+12:46:59 | 0007     | document | STARTED        |                                    | AL TAHER - 21543 1.pdf
+12:46:59 | 0008     | document | STARTED        |                                    | AL TAHER - 21544 1.pdf
+12:46:59 | 0009     | document | STARTED        |                                    | AL_TAHER_blurry_test.pdf
+12:46:59 | 0010     | document | STARTED        |                                    | AL_TAHER_low_blurry.pdf
+12:46:59 | 0011     | document | STARTED        |                                    | AL_TAHER_very_light_blur(1).pdf
+12:46:59 | 0012     | document | STARTED        |                                    | BRIGHT PHARMACY - 162645 1.pdf
+12:46:59 | 0013     | document | STARTED        |                                    | CLASSIC MARINE-5-8.pdf
+12:46:59 | 0014     | document | STARTED        |                                    | CLASSIC MARINE-9-12.pdf
+12:46:59 | 0015     | document | STARTED        |                                    | DEC 2019_UCC1A.PDF
+12:46:59 | 0006     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:46:59 | 0007     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:46:59 | 0008     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:46:59 | 0009     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:46:59 | 0010     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:46:59 | 0011     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:46:59 | 0012     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:46:59 | 0013     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:46:59 | 0014     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:46:59 | 0015     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:47:05 | 0015     | convert  | OVER-THRESHOLD | latency   5.61s (threshold   1.0s) | PDF-to-Images converter; 4 pages
+12:47:05 | 0015/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:05 | 0015/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:05 | 0015/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:05 | 0015/04  | enhance  | STARTED        |                                    | Image enhancement
+12:47:06 | 0015/03  | enhance  | OK             | latency   0.86s (threshold   5.0s) | Image enhancement
+12:47:06 | 0015/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:06 | 0015/01  | enhance  | OK             | latency   1.27s (threshold   5.0s) | Image enhancement
+12:47:06 | 0015/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:07 | 0015/04  | enhance  | OK             | latency   1.55s (threshold   5.0s) | Image enhancement
+12:47:07 | 0015/04  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:07 | 0015/02  | enhance  | OK             | latency   1.90s (threshold   5.0s) | Image enhancement
+12:47:07 | 0015/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:08 | 0008     | convert  | OVER-THRESHOLD | latency   8.73s (threshold   1.0s) | PDF-to-Images converter; 3 pages
+12:47:08 | 0008/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:08 | 0008/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:08 | 0008/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:08 | 0007     | convert  | OVER-THRESHOLD | latency   9.20s (threshold   1.0s) | PDF-to-Images converter; 3 pages
+12:47:09 | 0007/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:09 | 0007/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:09 | 0007/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:09 | 0012     | convert  | OVER-THRESHOLD | latency   9.83s (threshold   1.0s) | PDF-to-Images converter; 3 pages
+12:47:09 | 0012/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:09 | 0012/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:09 | 0012/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:09 | 0013     | convert  | OVER-THRESHOLD | latency   9.98s (threshold   1.0s) | PDF-to-Images converter; 4 pages
+12:47:09 | 0013/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:09 | 0013/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:09 | 0013/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:10 | 0013/04  | enhance  | STARTED        |                                    | Image enhancement
+12:47:10 | 0014     | convert  | OVER-THRESHOLD | latency  10.23s (threshold   1.0s) | PDF-to-Images converter; 4 pages
+12:47:10 | 0014/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:10 | 0014/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:10 | 0014/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:10 | 0014/04  | enhance  | STARTED        |                                    | Image enhancement
+12:47:11 | 0009     | convert  | OVER-THRESHOLD | latency  11.86s (threshold   1.0s) | PDF-to-Images converter; 3 pages
+12:47:11 | 0009/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:11 | 0009/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:11 | 0009/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:14 | 0006     | convert  | OVER-THRESHOLD | latency  14.36s (threshold   1.0s) | PDF-to-Images converter; 4 pages
+12:47:14 | 0006/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:14 | 0006/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:14 | 0006/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:14 | 0006/04  | enhance  | STARTED        |                                    | Image enhancement
+12:47:16 | 0015/01  | assess   | OVER-THRESHOLD | latency   9.93s (threshold   5.0s) | score 88.8 -> clear
+12:47:16 | 0015/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:47:17 | 0015/03  | assess   | OVER-THRESHOLD | latency  11.17s (threshold   5.0s) | score 82.2 -> clear
+12:47:17 | 0015/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:47:17 | 0015/04  | assess   | OVER-THRESHOLD | latency  10.49s (threshold   5.0s) | score 83.8 -> clear
+12:47:18 | 0015/04  | route    | STARTED        |                                    | Model router based on the quality score
+12:47:18 | 0010     | convert  | OVER-THRESHOLD | latency  18.43s (threshold   1.0s) | PDF-to-Images converter; 3 pages
+12:47:18 | 0010/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:18 | 0010/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:18 | 0010/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:20 | 0015/02  | assess   | OVER-THRESHOLD | latency  12.50s (threshold   5.0s) | score 84.2 -> clear
+12:47:20 | 0015/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:47:21 | 0011     | convert  | OVER-THRESHOLD | latency  21.59s (threshold   1.0s) | PDF-to-Images converter; 3 pages
+12:47:21 | 0011/01  | enhance  | STARTED        |                                    | Image enhancement
+12:47:22 | 0011/02  | enhance  | STARTED        |                                    | Image enhancement
+12:47:22 | 0011/03  | enhance  | STARTED        |                                    | Image enhancement
+12:47:31 | 0008/03  | enhance  | OVER-THRESHOLD | latency  23.27s (threshold   5.0s) | Image enhancement
+12:47:31 | 0008/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:32 | 0007/01  | enhance  | OVER-THRESHOLD | latency  22.92s (threshold   5.0s) | Image enhancement
+12:47:32 | 0007/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:34 | 0008/01  | enhance  | OVER-THRESHOLD | latency  26.22s (threshold   5.0s) | Image enhancement
+12:47:34 | 0007/02  | enhance  | OVER-THRESHOLD | latency  25.66s (threshold   5.0s) | Image enhancement
+12:47:35 | 0008/02  | enhance  | OVER-THRESHOLD | latency  26.40s (threshold   5.0s) | Image enhancement
+12:47:35 | 0008/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:35 | 0007/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:35 | 0008/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:36 | 0007/03  | enhance  | OVER-THRESHOLD | latency  27.34s (threshold   5.0s) | Image enhancement
+12:47:36 | 0007/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:42 | 0013/01  | enhance  | OVER-THRESHOLD | latency  32.55s (threshold   5.0s) | Image enhancement
+12:47:42 | 0013/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:44 | 0012/01  | enhance  | OVER-THRESHOLD | latency  35.02s (threshold   5.0s) | Image enhancement
+12:47:44 | 0012/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:44 | 0012/03  | enhance  | OVER-THRESHOLD | latency  35.06s (threshold   5.0s) | Image enhancement
+12:47:44 | 0012/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:46 | 0012/02  | enhance  | OVER-THRESHOLD | latency  36.45s (threshold   5.0s) | Image enhancement
+12:47:46 | 0012/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:47 | 0013/03  | enhance  | OVER-THRESHOLD | latency  37.02s (threshold   5.0s) | Image enhancement
+12:47:47 | 0013/02  | enhance  | OVER-THRESHOLD | latency  37.07s (threshold   5.0s) | Image enhancement
+12:47:47 | 0013/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:47 | 0013/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:51 | 0013/04  | enhance  | OVER-THRESHOLD | latency  41.28s (threshold   5.0s) | Image enhancement
+12:47:51 | 0015/01  | route    | OVER-THRESHOLD | latency  34.40s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:47:51 | 0015/03  | route    | OVER-THRESHOLD | latency  33.52s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:47:51 | 0015/04  | route    | OVER-THRESHOLD | latency  33.48s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:47:51 | 0013/04  | assess   | STARTED        |                                    | Quality assessment of images
+12:47:51 | 0015/01  | extract  | STARTED        |                                    | Data extraction
+12:47:59 | 0015/03  | extract  | STARTED        |                                    | Data extraction
+12:48:01 | 0015/04  | extract  | STARTED        |                                    | Data extraction
+12:48:06 | 0014/01  | enhance  | OVER-THRESHOLD | latency  56.65s (threshold   5.0s) | Image enhancement
+12:48:06 | 0014/03  | enhance  | OVER-THRESHOLD | latency  56.50s (threshold   5.0s) | Image enhancement
+12:48:06 | 0009/01  | enhance  | OVER-THRESHOLD | latency  55.02s (threshold   5.0s) | Image enhancement
+12:48:06 | 0015/02  | route    | OVER-THRESHOLD | latency  46.66s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:48:06 | 0009/02  | enhance  | OVER-THRESHOLD | latency  54.98s (threshold   5.0s) | Image enhancement
+12:48:07 | 0014/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:07 | 0014/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:07 | 0009/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:07 | 0015/02  | extract  | STARTED        |                                    | Data extraction
+12:48:09 | 0009/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:10 | 0009/03  | enhance  | OVER-THRESHOLD | latency  58.64s (threshold   5.0s) | Image enhancement
+12:48:10 | 0009/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:14 | 0014/04  | enhance  | OVER-THRESHOLD | latency  64.08s (threshold   5.0s) | Image enhancement
+12:48:15 | 0014/04  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:16 | 0014/02  | enhance  | OVER-THRESHOLD | latency  65.70s (threshold   5.0s) | Image enhancement
+12:48:16 | 0014/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:19 | 0010/02  | enhance  | OVER-THRESHOLD | latency  60.33s (threshold   5.0s) | Image enhancement
+12:48:19 | 0010/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:19 | 0010/01  | enhance  | OVER-THRESHOLD | latency  60.54s (threshold   5.0s) | Image enhancement
+12:48:19 | 0010/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:19 | 0010/03  | enhance  | OVER-THRESHOLD | latency  60.87s (threshold   5.0s) | Image enhancement
+12:48:19 | 0010/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:22 | 0011/01  | enhance  | OVER-THRESHOLD | latency  60.19s (threshold   5.0s) | Image enhancement
+12:48:22 | 0011/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:26 | 0011/02  | enhance  | OVER-THRESHOLD | latency  63.91s (threshold   5.0s) | Image enhancement
+12:48:26 | 0011/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:30 | 0011/03  | enhance  | OVER-THRESHOLD | latency  68.00s (threshold   5.0s) | Image enhancement
+12:48:30 | 0011/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:33 | 0008/02  | assess   | OVER-THRESHOLD | latency  57.87s (threshold   5.0s) | score 85.2 -> clear
+12:48:33 | 0008/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:34 | 0008/03  | assess   | OVER-THRESHOLD | latency  62.38s (threshold   5.0s) | score 92.1 -> clear
+12:48:34 | 0008/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:34 | 0008/01  | assess   | OVER-THRESHOLD | latency  59.70s (threshold   5.0s) | score 89.5 -> clear
+12:48:34 | 0008/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:35 | 0007/02  | assess   | OVER-THRESHOLD | latency  60.66s (threshold   5.0s) | score 85.9 -> clear
+12:48:35 | 0007/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:37 | 0007/01  | assess   | OVER-THRESHOLD | latency  65.25s (threshold   5.0s) | score 88.1 -> clear
+12:48:37 | 0007/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:37 | 0006/01  | enhance  | OVER-THRESHOLD | latency  83.47s (threshold   5.0s) | Image enhancement
+12:48:38 | 0006/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:38 | 0007/03  | assess   | OVER-THRESHOLD | latency  62.07s (threshold   5.0s) | score 90.2 -> clear
+12:48:38 | 0007/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:41 | 0012/03  | assess   | OVER-THRESHOLD | latency  56.51s (threshold   5.0s) | score 92.4 -> clear
+12:48:41 | 0012/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:42 | 0012/01  | assess   | OVER-THRESHOLD | latency  57.28s (threshold   5.0s) | score 87.1 -> clear
+12:48:42 | 0012/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:43 | 0006/04  | enhance  | OVER-THRESHOLD | latency  88.49s (threshold   5.0s) | Image enhancement
+12:48:43 | 0006/04  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:43 | 0006/02  | enhance  | OVER-THRESHOLD | latency  89.15s (threshold   5.0s) | Image enhancement
+12:48:43 | 0014/03  | assess   | OVER-THRESHOLD | latency  36.50s (threshold   5.0s) | score 90.2 -> clear
+12:48:43 | 0006/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:43 | 0014/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:44 | 0013/01  | assess   | OVER-THRESHOLD | latency  61.44s (threshold   5.0s) | score 90.4 -> clear
+12:48:44 | 0013/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:44 | 0013/03  | assess   | OVER-THRESHOLD | latency  57.64s (threshold   5.0s) | score 89.7 -> clear
+12:48:44 | 0013/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:45 | 0013/02  | assess   | OVER-THRESHOLD | latency  58.06s (threshold   5.0s) | score 88.9 -> clear
+12:48:45 | 0013/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:47 | 0009/01  | assess   | OVER-THRESHOLD | latency  39.76s (threshold   5.0s) | score 0.0 -> very_blurry
+12:48:47 | 0009/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:51 | 0006/03  | enhance  | OVER-THRESHOLD | latency  96.55s (threshold   5.0s) | Image enhancement
+12:48:51 | 0006/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:48:51 | 0009/02  | assess   | OVER-THRESHOLD | latency  41.99s (threshold   5.0s) | score 0.0 -> very_blurry
+12:48:51 | 0009/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:53 | 0012/02  | assess   | OVER-THRESHOLD | latency  66.65s (threshold   5.0s) | score 85.9 -> clear
+12:48:53 | 0008/02  | route    | OVER-THRESHOLD | latency  19.72s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:48:53 | 0008/03  | route    | OVER-THRESHOLD | latency  18.59s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:48:53 | 0008/01  | route    | OVER-THRESHOLD | latency  18.23s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:48:53 | 0007/02  | route    | OVER-THRESHOLD | latency  17.21s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:48:53 | 0007/01  | route    | OVER-THRESHOLD | latency  15.66s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:48:53 | 0012/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:48:53 | 0008/02  | extract  | STARTED        |                                    | Data extraction
+12:48:58 | 0008/03  | extract  | STARTED        |                                    | Data extraction
+12:48:59 | 0008/01  | extract  | STARTED        |                                    | Data extraction
+12:49:00 | 0007/02  | extract  | STARTED        |                                    | Data extraction
+12:49:04 | 0007/01  | extract  | STARTED        |                                    | Data extraction
+12:49:06 | 0010/01  | assess   | OVER-THRESHOLD | latency  46.77s (threshold   5.0s) | score 82.9 -> clear
+12:49:06 | 0007/03  | route    | OVER-THRESHOLD | latency  27.26s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:06 | 0012/03  | route    | OVER-THRESHOLD | latency  24.72s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:06 | 0012/01  | route    | OVER-THRESHOLD | latency  24.03s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:06 | 0014/01  | assess   | OVER-THRESHOLD | latency  59.00s (threshold   5.0s) | score 90.9 -> clear
+12:49:06 | 0014/04  | assess   | OVER-THRESHOLD | latency  50.88s (threshold   5.0s) | score 89.4 -> clear
+12:49:06 | 0014/03  | route    | OVER-THRESHOLD | latency  22.38s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:06 | 0013/01  | route    | OVER-THRESHOLD | latency  22.11s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:06 | 0013/03  | route    | OVER-THRESHOLD | latency  21.42s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:06 | 0013/02  | route    | OVER-THRESHOLD | latency  20.94s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:06 | 0009/01  | route    | OVER-THRESHOLD | latency  18.94s (threshold   5.0s) | model qwen/qwen3.8-omni-flash:free
+12:49:06 | 0009/03  | assess   | OVER-THRESHOLD | latency  55.38s (threshold   5.0s) | score 0.0 -> very_blurry
+12:49:06 | 0009/02  | route    | OVER-THRESHOLD | latency  14.59s (threshold   5.0s) | model qwen/qwen3.8-omni-flash:free
+12:49:06 | 0012/02  | route    | OVER-THRESHOLD | latency  12.84s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:06 | 0014/02  | assess   | OVER-THRESHOLD | latency  50.05s (threshold   5.0s) | score 89.6 -> clear
+12:49:06 | 0013/04  | assess   | OVER-THRESHOLD | latency  74.42s (threshold   5.0s) | score 88.0 -> clear
+12:49:06 | 0010/02  | assess   | OVER-THRESHOLD | latency  47.05s (threshold   5.0s) | score 79.4 -> blurry
+12:49:06 | 0010/03  | assess   | OVER-THRESHOLD | latency  46.44s (threshold   5.0s) | score 85.5 -> clear
+12:49:06 | 0006/04  | assess   | OVER-THRESHOLD | latency  23.23s (threshold   5.0s) | score 90.7 -> clear
+12:49:06 | 0011/03  | assess   | OVER-THRESHOLD | latency  36.02s (threshold   5.0s) | score 89.8 -> clear
+12:49:06 | 0011/01  | assess   | OVER-THRESHOLD | latency  44.03s (threshold   5.0s) | score 82.7 -> clear
+12:49:06 | 0015/01  | extract  | RETRY          |                                    | APITimeoutError: Request timed out.; retry 1 of 2 (document retries left: 4)
+12:49:06 | 0015/04  | extract  | RETRY          |                                    | APITimeoutError: Request timed out.; retry 1 of 2 (document retries left: 3)
+12:49:06 | 0015/03  | extract  | RETRY          |                                    | APITimeoutError: Request timed out.; retry 1 of 2 (document retries left: 2)
+12:49:06 | 0010/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:06 | 0007/03  | extract  | STARTED        |                                    | Data extraction
+12:49:07 | 0012/03  | extract  | STARTED        |                                    | Data extraction
+12:49:11 | 0012/01  | extract  | STARTED        |                                    | Data extraction
+12:49:11 | 0014/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:11 | 0014/04  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:11 | 0014/03  | extract  | STARTED        |                                    | Data extraction
+12:49:15 | 0013/01  | extract  | STARTED        |                                    | Data extraction
+12:49:19 | 0013/03  | extract  | STARTED        |                                    | Data extraction
+12:49:20 | 0013/02  | extract  | STARTED        |                                    | Data extraction
+12:49:21 | 0009/01  | extract  | STARTED        |                                    | Data extraction
+12:49:25 | 0009/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:25 | 0009/02  | extract  | STARTED        |                                    | Data extraction
+12:49:25 | 0012/02  | extract  | STARTED        |                                    | Data extraction
+12:49:26 | 0014/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:26 | 0013/04  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:26 | 0010/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:26 | 0010/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:26 | 0006/04  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:26 | 0011/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:26 | 0011/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:26 | 0010/01  | route    | OVER-THRESHOLD | latency  20.14s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:26 | 0011/02  | assess   | OVER-THRESHOLD | latency  60.51s (threshold   5.0s) | score 87.5 -> clear
+12:49:26 | 0006/02  | assess   | OVER-THRESHOLD | latency  42.91s (threshold   5.0s) | score 87.3 -> clear
+12:49:26 | 0006/01  | assess   | OVER-THRESHOLD | latency  48.04s (threshold   5.0s) | score 89.8 -> clear
+12:49:26 | 0006/03  | assess   | OVER-THRESHOLD | latency  35.55s (threshold   5.0s) | score 87.9 -> clear
+12:49:26 | 0014/01  | route    | OVER-THRESHOLD | latency  14.84s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:26 | 0014/04  | route    | OVER-THRESHOLD | latency  14.84s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:26 | 0009/03  | route    | OK             | latency   1.88s (threshold   5.0s) | model qwen/qwen3.8-omni-flash:free
+12:49:27 | 0014/02  | route    | OK             | latency   0.38s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:27 | 0013/04  | route    | OK             | latency   0.38s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:27 | 0010/02  | route    | OK             | latency   0.38s (threshold   5.0s) | model qwen/qwen3.8-max:free
+12:49:27 | 0010/03  | route    | OK             | latency   0.38s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:27 | 0006/04  | route    | OK             | latency   0.38s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:27 | 0011/03  | route    | OK             | latency   0.38s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:27 | 0011/01  | route    | OK             | latency   0.38s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:27 | 0015/02  | extract  | RETRY          |                                    | APITimeoutError: Request timed out.; retry 1 of 2 (document retries left: 1)
+12:49:27 | 0010/01  | extract  | STARTED        |                                    | Data extraction
+12:49:30 | 0011/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:30 | 0006/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:30 | 0006/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:30 | 0006/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:49:30 | 0014/01  | extract  | STARTED        |                                    | Data extraction
+12:49:31 | 0014/04  | extract  | STARTED        |                                    | Data extraction
+12:49:32 | 0009/03  | extract  | STARTED        |                                    | Data extraction
+12:49:33 | 0014/02  | extract  | STARTED        |                                    | Data extraction
+12:49:34 | 0013/04  | extract  | STARTED        |                                    | Data extraction
+12:49:35 | 0010/02  | extract  | STARTED        |                                    | Data extraction
+12:49:36 | 0010/03  | extract  | STARTED        |                                    | Data extraction
+12:49:37 | 0006/04  | extract  | STARTED        |                                    | Data extraction
+12:49:40 | 0011/03  | extract  | STARTED        |                                    | Data extraction
+12:49:43 | 0011/01  | extract  | STARTED        |                                    | Data extraction
+12:49:44 | 0011/02  | route    | OVER-THRESHOLD | latency  13.95s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:44 | 0006/02  | route    | OVER-THRESHOLD | latency  13.95s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:44 | 0006/01  | route    | OVER-THRESHOLD | latency  13.95s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:44 | 0006/03  | route    | OVER-THRESHOLD | latency  13.95s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:49:44 | 0011/02  | extract  | STARTED        |                                    | Data extraction
+12:49:45 | 0006/02  | extract  | STARTED        |                                    | Data extraction
+12:49:46 | 0006/01  | extract  | STARTED        |                                    | Data extraction
+12:49:47 | 0006/03  | extract  | STARTED        |                                    | Data extraction
+12:49:56 | 0015/01  | extract  | OVER-THRESHOLD | latency 125.04s (threshold   5.0s) | completed; APITimeoutError: Request timed out.; tokens 3270 (input 3067, output 203); document total 3270 tokens; retries 1
+12:49:57 | 0014/01  | extract  | OVER-THRESHOLD | latency  26.75s (threshold   5.0s) | completed; tokens 3355 (input 3067, output 288); document total 3355 tokens
+12:49:58 | 0015/03  | extract  | OVER-THRESHOLD | latency 118.72s (threshold   5.0s) | completed; APITimeoutError: Request timed out.; tokens 3261 (input 3067, output 194); document total 6531 tokens; retries 1
+12:49:58 | 0015     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:49:59 | 0010/01  | extract  | OVER-THRESHOLD | latency  32.04s (threshold   5.0s) | completed; tokens 3354 (input 3067, output 287); document total 3354 tokens
+12:49:59 | 0008/02  | extract  | OVER-THRESHOLD | latency  66.33s (threshold   5.0s) | completed; tokens 3344 (input 3067, output 277); document total 3344 tokens
+12:49:59 | 0015/02  | extract  | OVER-THRESHOLD | latency 112.24s (threshold   5.0s) | completed; APITimeoutError: Request timed out.; tokens 3261 (input 3067, output 194); document total 9792 tokens; retries 1
+12:49:59 | 0007/02  | extract  | OVER-THRESHOLD | latency  59.15s (threshold   5.0s) | completed; tokens 3344 (input 3067, output 277); document total 3344 tokens
+12:50:00 | 0007/01  | extract  | OVER-THRESHOLD | latency  55.39s (threshold   5.0s) | completed; tokens 3353 (input 3067, output 286); document total 6697 tokens
+12:50:00 | 0007     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:50:00 | 0006/03  | extract  | OVER-THRESHOLD | latency  13.07s (threshold   5.0s) | completed; tokens 3312 (input 3067, output 245); document total 3312 tokens
+12:50:00 | 0011/03  | extract  | OVER-THRESHOLD | latency  19.67s (threshold   5.0s) | completed; tokens 3317 (input 3067, output 250); document total 3317 tokens
+12:50:00 | 0006/04  | extract  | OVER-THRESHOLD | latency  23.23s (threshold   5.0s) | completed; tokens 3308 (input 3067, output 241); document total 6620 tokens
+12:50:00 | 0006     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:50:01 | 0014/04  | extract  | OVER-THRESHOLD | latency  29.58s (threshold   5.0s) | completed; tokens 3306 (input 3067, output 239); document total 6661 tokens
+12:50:01 | 0014     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:50:01 | 0007/03  | extract  | OVER-THRESHOLD | latency  54.79s (threshold   5.0s) | completed; tokens 3316 (input 3067, output 249); document total 10013 tokens
+12:50:01 | 0007     | output   | STARTED        |                                    | JSON output
+12:50:01 | 0013/01  | extract  | OVER-THRESHOLD | latency  46.10s (threshold   5.0s) | completed; tokens 3355 (input 3067, output 288); document total 3355 tokens
+12:50:01 | 0011/02  | extract  | OVER-THRESHOLD | latency  16.95s (threshold   5.0s) | completed; tokens 3344 (input 3067, output 277); document total 6661 tokens
+12:50:01 | 0011     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:50:02 | 0013/03  | extract  | OVER-THRESHOLD | latency  43.01s (threshold   5.0s) | completed; tokens 3306 (input 3067, output 239); document total 6661 tokens
+12:50:02 | 0013     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:50:02 | 0013/04  | extract  | OVER-THRESHOLD | latency  27.68s (threshold   5.0s) | completed; tokens 3298 (input 3067, output 231); document total 9959 tokens
+12:50:02 | 0008/01  | extract  | OVER-THRESHOLD | latency  62.81s (threshold   5.0s) | completed; tokens 3354 (input 3067, output 287); document total 6698 tokens
+12:50:02 | 0008     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:50:02 | 0013/02  | extract  | OVER-THRESHOLD | latency  41.72s (threshold   5.0s) | completed; tokens 3306 (input 3067, output 239); document total 13265 tokens
+12:50:02 | 0013     | output   | STARTED        |                                    | JSON output
+12:50:02 | 0014/02  | extract  | OVER-THRESHOLD | latency  29.08s (threshold   5.0s) | completed; tokens 3298 (input 3067, output 231); document total 9959 tokens
+12:50:02 | 0006/01  | extract  | OVER-THRESHOLD | latency  15.71s (threshold   5.0s) | completed; tokens 3355 (input 3067, output 288); document total 9975 tokens
+12:50:02 | 0011/01  | extract  | OVER-THRESHOLD | latency  18.79s (threshold   5.0s) | completed; tokens 3354 (input 3067, output 287); document total 10015 tokens
+12:50:02 | 0011     | output   | STARTED        |                                    | JSON output
+12:50:02 | 0012/03  | extract  | OVER-THRESHOLD | latency  55.03s (threshold   5.0s) | completed; tokens 3308 (input 3067, output 241); document total 3308 tokens
+12:50:02 | 0006/02  | extract  | OVER-THRESHOLD | latency  16.82s (threshold   5.0s) | completed; tokens 3337 (input 3067, output 270); document total 13312 tokens
+12:50:02 | 0006     | output   | STARTED        |                                    | JSON output
+12:50:02 | 0012/01  | extract  | OVER-THRESHOLD | latency  51.59s (threshold   5.0s) | completed; tokens 3356 (input 3084, output 272); document total 6664 tokens
+12:50:02 | 0012     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:50:02 | 0010/03  | extract  | OVER-THRESHOLD | latency  26.16s (threshold   5.0s) | completed; tokens 3317 (input 3067, output 250); document total 6671 tokens
+12:50:02 | 0010     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:50:02 | 0014/03  | extract  | OVER-THRESHOLD | latency  50.82s (threshold   5.0s) | completed; tokens 3298 (input 3067, output 231); document total 13257 tokens
+12:50:02 | 0014     | output   | STARTED        |                                    | JSON output
+12:50:03 | 0010/02  | extract  | OVER-THRESHOLD | latency  28.06s (threshold   5.0s) | completed; tokens 3344 (input 3067, output 277); document total 10015 tokens
+12:50:03 | 0010     | output   | STARTED        |                                    | JSON output
+12:50:04 | 0007     | output   | OK             | latency   2.86s (threshold   5.0s) | JSON output; 3 pages; result.json
+12:50:04 | 0007     | summary  | COMPLETED      | latency 505.42s (document total)   | node times: convert 9.20s; enhance 75.92s; assess 187.98s; route 60.13s; extract 169.33s; output 2.86s
+12:50:04 | 0007     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\AL TAHER - 21543 1\result.json
+12:50:04 | 0016     | document | STARTED        |                                    | FRUITS GARDEN-1-7.pdf
+12:50:04 | 0016     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:50:05 | 0011     | output   | OK             | latency   3.28s (threshold   5.0s) | JSON output; 3 pages; result.json
+12:50:05 | 0011     | summary  | COMPLETED      | latency 427.65s (document total)   | node times: convert 21.59s; enhance 192.10s; assess 140.56s; route 14.71s; extract 55.41s; output 3.28s
+12:50:05 | 0011     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\AL_TAHER_very_light_blur(1)\result.json
+12:50:05 | 0017     | document | STARTED        |                                    | FRUITS GARDEN-8-11.pdf
+12:50:05 | 0017     | convert  | STARTED        |                                    | PDF-to-Images converter
+12:50:06 | 0012/02  | extract  | OVER-THRESHOLD | latency  40.54s (threshold   5.0s) | completed; tokens 3316 (input 3067, output 249); document total 9980 tokens
+12:50:06 | 0012     | output   | STARTED        |                                    | JSON output
+12:50:06 | 0006     | output   | OK             | latency   4.11s (threshold   5.0s) | JSON output; 4 pages; result.json
+12:50:06 | 0006     | summary  | COMPLETED      | latency 636.92s (document total)   | node times: convert 14.36s; enhance 357.66s; assess 149.73s; route 42.23s; extract 68.83s; output 4.11s
+12:50:06 | 0006     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\AL TAHER - 21542 1\result.json
+12:50:07 | 0015/04  | extract  | OVER-THRESHOLD | latency 123.05s (threshold   5.0s) | completed; APITimeoutError: Request timed out.; tokens 3261 (input 3067, output 194); document total 13053 tokens; retries 1
+12:50:07 | 0015     | output   | STARTED        |                                    | JSON output
+12:50:07 | 0009/02  | extract  | OVER-THRESHOLD | latency  42.15s (threshold   5.0s) | completed; tokens 1955 (input 1801, output 154); document total 1955 tokens
+12:50:07 | 0014     | output   | OK             | latency   4.49s (threshold   5.0s) | JSON output; 4 pages; result.json
+12:50:07 | 0014     | summary  | COMPLETED      | latency 642.75s (document total)   | node times: convert 10.23s; enhance 242.93s; assess 196.43s; route 52.44s; extract 136.23s; output 4.49s
+12:50:07 | 0014     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\CLASSIC MARINE-9-12\result.json
+12:50:08 | 0010     | output   | OK             | latency   4.91s (threshold   5.0s) | JSON output; 3 pages; result.json
+12:50:08 | 0010     | summary  | COMPLETED      | latency 452.50s (document total)   | node times: convert 18.43s; enhance 181.74s; assess 140.26s; route 20.90s; extract 86.26s; output 4.91s
+12:50:08 | 0010     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\AL_TAHER_low_blurry\result.json
+12:50:08 | 0009/03  | extract  | OVER-THRESHOLD | latency  35.89s (threshold   5.0s) | completed; tokens 1958 (input 1801, output 157); document total 3913 tokens
+12:50:08 | 0015     | output   | OK             | latency   1.72s (threshold   5.0s) | JSON output; 4 pages; result.json
+12:50:08 | 0015     | summary  | COMPLETED      | latency 684.11s (document total)   | node times: convert 5.61s; enhance 5.58s; assess 44.09s; route 148.06s; extract 479.05s; output 1.72s
+12:50:08 | 0015     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\DEC 2019_UCC1A\result.json
+12:50:09 | 0013     | output   | OVER-THRESHOLD | latency   7.03s (threshold   5.0s) | JSON output; 4 pages; result.json
+12:50:09 | 0013     | summary  | COMPLETED      | latency 639.85s (document total)   | node times: convert 9.98s; enhance 147.92s; assess 251.56s; route 64.85s; extract 158.51s; output 7.03s
+12:50:09 | 0013     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\CLASSIC MARINE-5-8\result.json
+12:50:09 | 0012     | output   | OK             | latency   3.65s (threshold   5.0s) | JSON output; 3 pages; result.json
+12:50:09 | 0012     | summary  | COMPLETED      | latency 509.20s (document total)   | node times: convert 9.83s; enhance 106.53s; assess 180.44s; route 61.59s; extract 147.16s; output 3.65s
+12:50:09 | 0012     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\BRIGHT PHARMACY - 162645 1\result.json
+12:50:11 | 0009/01  | extract  | OVER-THRESHOLD | latency  49.78s (threshold   5.0s) | completed; tokens 1955 (input 1801, output 154); document total 5868 tokens
+12:50:11 | 0009     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:50:11 | 0009     | output   | STARTED        |                                    | JSON output
+12:50:13 | 0009     | output   | OK             | latency   1.78s (threshold   5.0s) | JSON output; 3 pages; result.json
+12:50:13 | 0009     | summary  | COMPLETED      | latency 482.64s (document total)   | node times: convert 11.86s; enhance 168.64s; assess 137.13s; route 35.41s; extract 127.82s; output 1.78s
+12:50:13 | 0009     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\AL_TAHER_blurry_test\result.json
+12:50:13 | 0017     | convert  | OVER-THRESHOLD | latency   8.08s (threshold   1.0s) | PDF-to-Images converter; 4 pages
+12:50:13 | 0017/01  | enhance  | STARTED        |                                    | Image enhancement
+12:50:13 | 0017/02  | enhance  | STARTED        |                                    | Image enhancement
+12:50:13 | 0017/03  | enhance  | STARTED        |                                    | Image enhancement
+12:50:13 | 0017/04  | enhance  | STARTED        |                                    | Image enhancement
+12:50:15 | 0016     | convert  | OVER-THRESHOLD | latency  11.68s (threshold   1.0s) | PDF-to-Images converter; 7 pages
+12:50:16 | 0016/01  | enhance  | STARTED        |                                    | Image enhancement
+12:50:16 | 0016/02  | enhance  | STARTED        |                                    | Image enhancement
+12:50:16 | 0016/03  | enhance  | STARTED        |                                    | Image enhancement
+12:50:16 | 0016/04  | enhance  | STARTED        |                                    | Image enhancement
+12:50:16 | 0016/05  | enhance  | STARTED        |                                    | Image enhancement
+12:50:16 | 0016/06  | enhance  | STARTED        |                                    | Image enhancement
+12:50:16 | 0016/07  | enhance  | STARTED        |                                    | Image enhancement
+12:50:41 | 0017/04  | enhance  | OVER-THRESHOLD | latency  27.68s (threshold   5.0s) | Image enhancement
+12:50:41 | 0017/04  | assess   | STARTED        |                                    | Quality assessment of images
+12:50:41 | 0017/02  | enhance  | OVER-THRESHOLD | latency  27.76s (threshold   5.0s) | Image enhancement
+12:50:41 | 0017/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:50:42 | 0017/03  | enhance  | OVER-THRESHOLD | latency  28.53s (threshold   5.0s) | Image enhancement
+12:50:42 | 0017/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:50:44 | 0016/06  | enhance  | OVER-THRESHOLD | latency  28.78s (threshold   5.0s) | Image enhancement
+12:50:44 | 0016/06  | assess   | STARTED        |                                    | Quality assessment of images
+12:50:46 | 0016/01  | enhance  | OVER-THRESHOLD | latency  30.67s (threshold   5.0s) | Image enhancement
+12:50:46 | 0016/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:50:56 | 0017/04  | assess   | OVER-THRESHOLD | latency  14.61s (threshold   5.0s) | score 91.7 -> clear
+12:50:56 | 0017/04  | route    | STARTED        |                                    | Model router based on the quality score
+12:50:56 | 0017/04  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:50:56 | 0017/04  | extract  | STARTED        |                                    | Data extraction
+12:51:01 | 0017/03  | assess   | OVER-THRESHOLD | latency  19.25s (threshold   5.0s) | score 86.2 -> clear
+12:51:01 | 0016/06  | assess   | OVER-THRESHOLD | latency  16.94s (threshold   5.0s) | score 87.1 -> clear
+12:51:01 | 0017/02  | assess   | OVER-THRESHOLD | latency  20.09s (threshold   5.0s) | score 86.5 -> clear
+12:51:01 | 0017/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:01 | 0016/06  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:01 | 0017/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:01 | 0017/03  | route    | OK             | latency   0.02s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:51:01 | 0016/06  | route    | OK             | latency   0.02s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:51:01 | 0017/02  | route    | OK             | latency   0.02s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:51:01 | 0017/03  | extract  | STARTED        |                                    | Data extraction
+12:51:03 | 0016/06  | extract  | STARTED        |                                    | Data extraction
+12:51:07 | 0017/02  | extract  | STARTED        |                                    | Data extraction
+12:51:08 | 0017/01  | enhance  | OVER-THRESHOLD | latency  54.96s (threshold   5.0s) | Image enhancement
+12:51:08 | 0016/01  | assess   | OVER-THRESHOLD | latency  22.18s (threshold   5.0s) | score 75.1 -> blurry
+12:51:08 | 0016/05  | enhance  | OVER-THRESHOLD | latency  52.87s (threshold   5.0s) | Image enhancement
+12:51:08 | 0017/01  | assess   | STARTED        |                                    | Quality assessment of images
+12:51:08 | 0016/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:08 | 0016/05  | assess   | STARTED        |                                    | Quality assessment of images
+12:51:09 | 0016/01  | route    | OK             | latency   0.05s (threshold   5.0s) | model qwen/qwen3.8-max:free
+12:51:09 | 0016/01  | extract  | STARTED        |                                    | Data extraction
+12:51:10 | 0016/03  | enhance  | OVER-THRESHOLD | latency  54.94s (threshold   5.0s) | Image enhancement
+12:51:10 | 0016/04  | enhance  | OVER-THRESHOLD | latency  54.93s (threshold   5.0s) | Image enhancement
+12:51:10 | 0016/07  | enhance  | OVER-THRESHOLD | latency  54.90s (threshold   5.0s) | Image enhancement
+12:51:10 | 0016/02  | enhance  | OVER-THRESHOLD | latency  54.96s (threshold   5.0s) | Image enhancement
+12:51:11 | 0016/03  | assess   | STARTED        |                                    | Quality assessment of images
+12:51:11 | 0016/04  | assess   | STARTED        |                                    | Quality assessment of images
+12:51:11 | 0016/07  | assess   | STARTED        |                                    | Quality assessment of images
+12:51:11 | 0016/02  | assess   | STARTED        |                                    | Quality assessment of images
+12:51:18 | 0017/03  | extract  | OVER-THRESHOLD | latency  16.49s (threshold   5.0s) | completed; tokens 3261 (input 3067, output 194); document total 3261 tokens
+12:51:18 | 0016/07  | assess   | OVER-THRESHOLD | latency   7.87s (threshold   5.0s) | score 91.5 -> clear
+12:51:18 | 0016/07  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:18 | 0016/07  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:51:18 | 0016/07  | extract  | STARTED        |                                    | Data extraction
+12:51:20 | 0016/05  | assess   | OVER-THRESHOLD | latency  11.16s (threshold   5.0s) | score 81.4 -> clear
+12:51:20 | 0017/02  | extract  | OVER-THRESHOLD | latency  12.52s (threshold   5.0s) | completed; tokens 3316 (input 3067, output 249); document total 6577 tokens
+12:51:20 | 0017     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:51:20 | 0016/05  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:20 | 0016/05  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:51:20 | 0016/05  | extract  | STARTED        |                                    | Data extraction
+12:51:21 | 0016/04  | assess   | OVER-THRESHOLD | latency  10.50s (threshold   5.0s) | score 84.7 -> clear
+12:51:21 | 0016/06  | extract  | OVER-THRESHOLD | latency  18.50s (threshold   5.0s) | completed; tokens 3282 (input 3067, output 215); document total 3282 tokens
+12:51:21 | 0016/04  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:21 | 0016/04  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:51:21 | 0016/04  | extract  | STARTED        |                                    | Data extraction
+12:51:22 | 0016/03  | assess   | OVER-THRESHOLD | latency  11.88s (threshold   5.0s) | score 86.8 -> clear
+12:51:22 | 0016/03  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:22 | 0016/03  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:51:22 | 0016/03  | extract  | STARTED        |                                    | Data extraction
+12:51:24 | 0016/01  | extract  | OVER-THRESHOLD | latency  15.08s (threshold   5.0s) | completed; tokens 3354 (input 3084, output 270); document total 6636 tokens
+12:51:24 | 0016     | tokens   | STOPPED        |                                    | Token limit has been reached for this document. Further model calls have been stopped.
+12:51:24 | 0017/04  | extract  | OVER-THRESHOLD | latency  28.05s (threshold   5.0s) | completed; tokens 3308 (input 3067, output 241); document total 9885 tokens
+12:51:24 | 0017/01  | assess   | OVER-THRESHOLD | latency  15.74s (threshold   5.0s) | score 81.8 -> clear
+12:51:24 | 0017/01  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:24 | 0017/01  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:51:24 | 0017     | output   | STARTED        |                                    | JSON output
+12:51:26 | 0016/02  | assess   | OVER-THRESHOLD | latency  15.22s (threshold   5.0s) | score 83.6 -> clear
+12:51:26 | 0016/02  | route    | STARTED        |                                    | Model router based on the quality score
+12:51:26 | 0016/02  | route    | OK             | latency   0.00s (threshold   5.0s) | model qwen/qwen3.7-plus:free
+12:51:26 | 0017     | output   | OK             | latency   2.20s (threshold   5.0s) | JSON output; 4 pages; result.json
+12:51:26 | 0017     | summary  | COMPLETED      | latency 276.00s (document total)   | node times: convert 8.08s; enhance 138.93s; assess 69.69s; route 0.04s; extract 57.06s; output 2.20s
+12:51:26 | 0017     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\FRUITS GARDEN-8-11\result.json
+12:51:29 | 0016/04  | extract  | OVER-THRESHOLD | latency   7.81s (threshold   5.0s) | completed; tokens 3261 (input 3067, output 194); document total 9897 tokens
+12:51:31 | 0016/07  | extract  | OVER-THRESHOLD | latency  12.16s (threshold   5.0s) | completed; tokens 3301 (input 3067, output 234); document total 13198 tokens
+12:51:31 | 0016/05  | extract  | OVER-THRESHOLD | latency  11.31s (threshold   5.0s) | completed; tokens 3261 (input 3067, output 194); document total 16459 tokens
+12:51:32 | 0016/03  | extract  | OVER-THRESHOLD | latency   9.35s (threshold   5.0s) | completed; tokens 3311 (input 3067, output 244); document total 19770 tokens
+12:51:32 | 0016     | output   | STARTED        |                                    | JSON output
+12:51:36 | 0016     | output   | OK             | latency   4.35s (threshold   5.0s) | JSON output; 7 pages; result.json
+12:51:36 | 0016     | summary  | COMPLETED      | latency 518.11s (document total)   | node times: convert 11.68s; enhance 332.05s; assess 95.75s; route 0.07s; extract 74.21s; output 4.35s
+12:51:36 | 0016     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\FRUITS GARDEN-1-7\result.json
+12:52:05 | 0008/03  | extract  | OVER-THRESHOLD | latency 187.06s (threshold   5.0s) | completed; tokens 3323 (input 3067, output 256); document total 10021 tokens
+12:52:05 | 0008     | output   | STARTED        |                                    | JSON output
+12:52:08 | 0008     | output   | OK             | latency   3.10s (threshold   5.0s) | JSON output; 3 pages; result.json
+12:52:08 | 0008     | summary  | COMPLETED      | latency 640.41s (document total)   | node times: convert 8.73s; enhance 75.89s; assess 179.95s; route 56.54s; extract 316.20s; output 3.10s
+12:52:08 | 0008     | result   | SAVED          |                                    | C:\GitHup\Ai Agent\New POC\New-POC\data\output\AL TAHER - 21544 1\result.json
+12:52:08 | run      | summary  | COMPLETED      |                                    | 12 succeeded, 0 failed

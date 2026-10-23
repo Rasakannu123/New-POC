@@ -6,7 +6,6 @@ Calculates a 0-100 quality score for each enhanced page image.
     1. Content        -> Tesseract per-word OCR confidence
     2. Readable words -> confidence >= 30 (stamps, borders, handwriting dropped)
     3. Quality Score  -> char-weighted mean of readable words
-                         x coverage factor (readable chars / 120)
     4. Tier           -> clear / blurry / very_blurry
 
 Tier thresholds:
@@ -35,7 +34,7 @@ TIER_BLURRY = "blurry"
 TIER_VERY_BLURRY = "very_blurry"
 
 READABLE_MIN_CONFIDENCE = 30.0
-COVERAGE_TARGET_CHARS = 120.0
+_OCR_MAX_SIDE = 1500
 
 
 @dataclass
@@ -53,7 +52,7 @@ class QualityAssessmentEngine:
         self,
         clear_threshold: float = 80.0,
         blurry_threshold: float = 50.0,
-        ocr_config: str = "--psm 3",
+        ocr_config: str = "--oem 1 --psm 6 -c tessedit_do_invert=0",
     ) -> None:
         """Loads Tesseract once; the pipeline's QUALITY_ASSESSMENT_CONCURRENCY
         limit decides how many pages are scored at the same time."""
@@ -67,7 +66,14 @@ class QualityAssessmentEngine:
     def assess(self, image: Image.Image) -> QualityAssessment:
         """Produces the 0-100 score and quality tier - the decision input for
         the model router, so pages that need an expensive model can be told
-        apart from pages that do not."""
+        apart from pages that do not. The OCR runs on a downscaled copy: the
+        score is a confidence estimate, so full 300-DPI resolution is wasted
+        work."""
+        if max(image.size) > _OCR_MAX_SIDE:
+            scale = _OCR_MAX_SIDE / max(image.size)
+            image = image.resize(
+                (round(image.width * scale), round(image.height * scale))
+            )
         gray = np.array(image.convert("L"))
         score = round(self._ocr_confidence_score(gray), 1)
 
@@ -83,8 +89,7 @@ class QualityAssessmentEngine:
     def _ocr_confidence_score(self, gray: np.ndarray) -> float:
         """Measures how confidently Tesseract reads the page. Junk words below
         the confidence floor (stamps, borders, handwriting) are excluded so they
-        cannot inflate the score, and the result is weighted by readable text
-        coverage so a nearly empty page never scores high."""
+        cannot inflate the score."""
         if self._pytesseract is None:
             return 0.0
 
@@ -95,8 +100,6 @@ class QualityAssessmentEngine:
                 config=self.ocr_config,
             )
 
-            all_confidences: list[float] = []
-            all_char_weights: list[int] = []
             readable_confidences: list[float] = []
             readable_char_weights: list[int] = []
 
@@ -117,8 +120,6 @@ class QualityAssessmentEngine:
                 if char_count <= 0:
                     continue
                 clipped = float(np.clip(conf, 0.0, 100.0))
-                all_confidences.append(clipped)
-                all_char_weights.append(char_count)
                 if clipped >= READABLE_MIN_CONFIDENCE:
                     readable_confidences.append(clipped)
                     readable_char_weights.append(char_count)
@@ -129,10 +130,8 @@ class QualityAssessmentEngine:
             mean_confidence = float(
                 np.average(readable_confidences, weights=readable_char_weights)
             )
-            coverage = min(1.0, sum(readable_char_weights) / COVERAGE_TARGET_CHARS)
-            score = mean_confidence * coverage
 
-            return float(np.clip(score, 0.0, 100.0))
+            return float(np.clip(mean_confidence, 0.0, 100.0))
 
         except Exception as exc:
             logger.warning("OCR-confidence metric failed: %s", exc)

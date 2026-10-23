@@ -49,6 +49,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TypedDict
@@ -521,13 +522,16 @@ def build_document_graph() -> StateGraph:
     return builder
 
 
-def _finalize(output_json: str, ctx: DocumentContext) -> None:
+def _finalize(output_json: str, ctx: DocumentContext, wall_seconds: float) -> None:
     """Adds the overall document latency report and the token/retry summary
     to result.json, and stores the total processing time in every page's
-    metadata."""
+    metadata. `wall_seconds` is the real elapsed clock time of the document,
+    while `total_processing_time` is the summed node work of pages that ran
+    in parallel."""
     path = Path(output_json)
     record = json.loads(path.read_text(encoding="utf-8"))
     total = ctx.latency.total()
+    record["wall_processing_time"] = wall_seconds
     record["total_processing_time"] = total
     record["node_latency"] = ctx.latency.node_totals()
     record["token_usage"] = {
@@ -547,8 +551,9 @@ def _finalize(output_json: str, ctx: DocumentContext) -> None:
     )
 
 
-def _report_latency(ctx: DocumentContext) -> None:
-    """Prints the processing time of every node and the document total."""
+def _report_latency(ctx: DocumentContext, wall_seconds: float) -> None:
+    """Prints the real elapsed wall time plus the summed node work of the
+    document (pages ran in parallel, so node work exceeds the wall time)."""
     totals = ctx.latency.node_totals()
     breakdown = "; ".join(
         f"{node} {seconds:.2f}s" for node, seconds in totals.items()
@@ -557,8 +562,8 @@ def _report_latency(ctx: DocumentContext) -> None:
         ctx.document_id,
         "summary",
         "COMPLETED",
-        f"node times: {breakdown}",
-        ctx.latency.total(),
+        f"node work {ctx.latency.total():.2f}s; node times: {breakdown}",
+        wall_seconds,
     )
 
 
@@ -595,6 +600,7 @@ async def run_async(pdf_files: list[Path] | None = None) -> int:
         done - documents finish independently and out of order."""
         ctx = DocumentContext.create(pdf_path)
         async with document_semaphore:
+            wall_started = time.perf_counter()
             console.emit(ctx.document_id, "document", "STARTED", pdf_path.name)
             try:
                 state = await graph.ainvoke({"ctx": ctx})
@@ -602,13 +608,14 @@ async def run_async(pdf_files: list[Path] | None = None) -> int:
                 logger.exception("Pipeline crashed for %s", ctx.document_id)
                 console.emit(ctx.document_id, "document", "FAILED", str(exc))
                 return False
+        wall_seconds = round(time.perf_counter() - wall_started, 2)
         if state.get("error"):
             console.emit(ctx.document_id, "document", "FAILED", state["error"])
             return False
         output_json = state.get("output_json", "")
         if output_json:
-            _finalize(output_json, ctx)
-        _report_latency(ctx)
+            _finalize(output_json, ctx, wall_seconds)
+        _report_latency(ctx, wall_seconds)
         console.emit(ctx.document_id, "result", "SAVED", output_json or "-")
         return True
 
